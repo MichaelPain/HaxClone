@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HaxBall Clone</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Schermata di Login -->
+        <div id="login-screen" class="screen">
+            <div class="container">
+                <h1>HaxBall Clone</h1>
+                
+                <div class="login-tabs">
+                    <button class="tab-btn active" data-tab="login">Accedi</button>
+                    <button class="tab-btn" data-tab="register">Registrati</button>
+                </div>
+                
+                <div id="login-tab">
+                    <div class="form-group">
+                        <label for="login-username">Username</label>
+                        <input type="text" id="login-username" placeholder="Inserisci il tuo username">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" placeholder="Inserisci la tua password">
+                    </div>
+                    
+                    <button id="login-btn" class="btn primary-btn">Accedi</button>
+                </div>
+                
+                <div id="register-tab" class="hidden">
+                    <div class="form-group">
+                        <label for="register-username">Username</label>
+                        <input type="text" id="register-username" placeholder="Scegli un username">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="register-email">Email</label>
+                        <input type="email" id="register-email" placeholder="Inserisci la tua email">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="register-password">Password</label>
+                        <input type="password" id="register-password" placeholder="Scegli una password">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="register-confirm-password">Conferma Password</label>
+                        <input type="password" id="register-confirm-password" placeholder="Conferma la tua password">
+                    </div>
+                    
+                    <button id="register-btn" class="btn primary-btn">Registrati</button>
+                </div>
+                
+                <div id="verification-message" class="hidden">
+                    <p>Grazie per esserti registrato! Ti abbiamo inviato un'email di conferma. Per favore, controlla la tua casella di posta e clicca sul link di verifica per attivare il tuo account.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Schermata Lobby -->
+        <div id="lobby-screen" class="screen hidden">
+            <div class="container">
+                <div class="header">
+                    <h1>HaxBall Clone</h1>
+                    <div class="user-info">
+                        <span id="user-display">Username</span>
+                        <span id="mmr-display">MMR: 1000</span>
+                        <button id="profile-btn" class="btn secondary-btn">Profilo</button>
+                    </div>
+                </div>
+                
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="rooms">Stanze</button>
+                    <button class="tab-btn" data-tab="ranked">Ranked</button>
+                    <button class="tab-btn" data-tab="rankings">Classifica</button>
+                </div>
+                
+                <div id="rooms-tab" class="tab-content active">
+                    <div class="action-bar">
+                        <button id="refresh-rooms-btn" class="btn secondary-btn">Aggiorna</button>
+                        <button id="create-room-btn" class="btn primary-btn">Crea Stanza</button>
+                    </div>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Giocatori</th>
+                                <th>Stato</th>
+                                <th>Azione</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rooms-list">
+                            <!-- Lista delle stanze -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="ranked-tab" class="tab-content">
+                    <h2>Partite Ranked</h2>
+                    <p>Gioca partite competitive e scala la classifica!</p>
+                    
+                    <div class="ranked-options">
+                        <button id="ranked-1v1-btn" class="btn ranked-btn">1v1</button>
+                        <button id="ranked-2v2-btn" class="btn ranked-btn">2v2</button>
+                        <button id="ranked-3v3-btn" class="btn ranked-btn">3v3+</button>
+                    </div>
+                    
+                    <div id="matchmaking-status" class="hidden">
+                        <p>Ricerca di una partita in corso...</p>
+                        <button id="cancel-matchmaking-btn" class="btn danger-btn">Annulla</button>
+                    </div>
+                </div>
+                
+                <div id="rankings-tab" class="tab-content">
+                    <h2>Classifiche</h2>
+                    
+                    <div class="rankings-tabs">
+                        <button class="tab-btn active" data-rankings-tab="global">Globale</button>
+                        <button class="tab-btn" data-rankings-tab="1v1">1v1</button>
+                        <button class="tab-btn" data-rankings-tab="2v2">2v2</button>
+                        <button class="tab-btn" data-rankings-tab="3v3">3v3+</button>
+                    </div>
+                    
+                    <div id="global-rankings" class="rankings-content active">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Giocatore</th>
+                                    <th>MMR</th>
+                                </tr>
+                            </thead>
+                            <tbody id="global-rankings-list">
+                                <!-- Lista dei giocatori -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="1v1-rankings" class="rankings-content">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Giocatore</th>
+                                    <th>MMR</th>
+                                </tr>
+                            </thead>
+                            <tbody id="1v1-rankings-list">
+                                <!-- Lista dei giocatori -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="2v2-rankings" class="rankings-content">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Giocatore</th>
+                                    <th>MMR</th>
+                                </tr>
+                            </thead>
+                            <tbody id="2v2-rankings-list">
+                                <!-- Lista dei giocatori -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="3v3-rankings" class="rankings-content">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Giocatore</th>
+                                    <th>MMR</th>
+                                </tr>
+                            </thead>
+                            <tbody id="3v3-rankings-list">
+                                <!-- Lista dei giocatori -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Schermata Profilo -->
+        <div id="profile-screen" class="screen hidden">
+            <div class="container">
+                <h1>Profilo Utente</h1>
+                
+                <div class="profile-info">
+                    <div class="form-group">
+                        <label for="profile-username">Username</label>
+                        <input type="text" id="profile-username">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="profile-email">Email</label>
+                        <input type="email" id="profile-email" disabled>
+                    </div>
+                    
+                    <h3>Statistiche</h3>
+                    <div class="mmr-container">
+                        <div class="mmr-item">
+                            <span>MMR Globale:</span>
+                            <span id="profile-mmr-global">1000</span>
+                        </div>
+                        <div class="mmr-item">
+                            <span>MMR 1v1:</span>
+                            <span id="profile-mmr-1v1">1000</span>
+                        </div>
+                        <div class="mmr-item">
+                            <span>MMR 2v2:</span>
+                            <span id="profile-mmr-2v2">1000</span>
+                        </div>
+                        <div class="mmr-item">
+                            <span>MMR 3v3+:</span>
+                            <span id="profile-mmr-3v3">1000</span>
+                        </div>
+                    </div>
+                    
+                    <h3>Cambia Password</h3>
+                    <div class="form-group">
+                        <label for="profile-current-password">Password Attuale</label>
+                        <input type="password" id="profile-current-password">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="profile-new-password">Nuova Password</label>
+                        <input type="password" id="profile-new-password">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="profile-confirm-password">Conferma Nuova Password</label>
+                        <input type="password" id="profile-confirm-password">
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button id="cancel-profile-btn" class="btn secondary-btn">Annulla</button>
+                    <button id="save-profile-btn" class="btn primary-btn">Salva</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Schermata Creazione Stanza -->
+        <div id="create-room-screen" class="screen hidden">
+            <div class="container">
+                <h1>Crea Stanza</h1>
+                
+                <div class="form-group">
+                    <label for="room-name">Nome Stanza</label>
+                    <input type="text" id="room-name" placeholder="Inserisci un nome per la stanza">
+                </div>
+                
+                <div class="form-group">
+                    <label for="max-players">Numero Massimo di Giocatori</label>
+                    <input type="number" id="max-players" min="2" max="10" value="6">
+                </div>
+                
+                <div class="form-group checkbox">
+                    <input type="checkbox" id="private-room">
+                    <label for="private-room">Stanza Privata</label>
+                </div>
+                
+                <div id="password-group" class="form-group hidden">
+                    <label for="room-password">Password</label>
+                    <input type="password" id="room-password" placeholder="Inserisci una password">
+                </div>
+                
+                <div class="form-group checkbox">
+                    <input type="checkbox" id="ranked-room">
+                    <label for="ranked-room">Stanza Ranked</label>
+                </div>
+                
+                <div class="action-buttons">
+                    <button id="cancel-create-room-btn" class="btn secondary-btn">Annulla</button>
+                    <button id="confirm-create-room-btn" class="btn primary-btn">Crea</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Schermata Unisciti a Stanza Privata -->
+        <div id="join-private-room-screen" class="screen hidden">
+            <div class="container">
+                <h1>Stanza Privata</h1>
+                
+                <div class="form-group">
+                    <label for="join-room-password">Password</label>
+                    <input type="password" id="join-room-password" placeholder="Inserisci la password della stanza">
+                </div>
+                
+                <div class="action-buttons">
+                    <button id="cancel-join-private-btn" class="btn secondary-btn">Annulla</button>
+                    <button id="confirm-join-private-btn" class="btn primary-btn">Unisciti</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Schermata Stanza -->
+        <div id="room-screen" class="screen hidden">
+            <div class="room-container">
+                <div class="room-header">
+                    <h1 id="room-title">Nome Stanza</h1>
+                    <div>
+                        <button id="start-game-btn" class="btn primary-btn hidden">Avvia Partita</button>
+                        <button id="leave-room-btn" class="btn danger-btn">Esci</button>
+                    </div>
+                </div>
+                
+                <div class="room-content">
+                    <div class="teams-container">
+                        <div class="team red-team">
+                            <h2>Squadra Rossa</h2>
+                            <ul id="red-team-list" class="team-list">
+                                <!-- Lista giocatori squadra rossa -->
+                            </ul>
+                            <button id="join-red-btn" class="btn red-btn team-btn">Unisciti</button>
+                        </div>
+                        
+                        <div class="team blue-team">
+                            <h2>Squadra Blu</h2>
+                            <ul id="blue-team-list" class="team-list">
+                                <!-- Lista giocatori squadra blu -->
+                            </ul>
+                            <button id="join-blue-btn" class="btn blue-btn team-btn">Unisciti</button>
+                        </div>
+                        
+                        <div class="team spectators">
+                            <h2>Spettatori</h2>
+                            <ul id="spectators-list" class="team-list">
+                                <!-- Lista spettatori -->
+                            </ul>
+                            <button id="join-spectators-btn" class="btn secondary-btn team-btn">Unisciti</button>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-container">
+                        <div id="chat-messages" class="chat-messages">
+                            <!-- Messaggi chat -->
+                        </div>
+                        <div class="chat-input">
+                            <input type="text" id="chat-input" placeholder="Scrivi un messaggio...">
+                            <button id="send-chat-btn" class="btn primary-btn">Invia</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Schermata Gioco -->
+        <div id="game-screen" class="screen hidden">
+            <div class="game-header">
+                <div class="score-container">
+                    <div class="team-score red-score">
+                        <span>Rossi:</span>
+                        <span id="red-score" class="score">0</span>
+                    </div>
+                    <div class="timer" id="game-timer">00:00</div>
+                    <div class="team-score blue-score">
+                        <span>Blu:</span>
+                        <span id="blue-score" class="score">0</span>
+                    </div>
+                </div>
+                <button id="exit-game-btn" class="btn danger-btn">Esci</button>
+            </div>
+            
+            <div class="game-container">
+                <canvas id="game-canvas"></canvas>
+            </div>
+        </div>
+        
+        <!-- Schermata Replay -->
+        <div id="replay-screen" class="screen hidden">
+            <div class="replay-header">
+                <h1>Replay</h1>
+                <div class="replay-controls">
+                    <button id="play-pause-replay-btn" class="btn secondary-btn">Pausa</button>
+                    <input type="range" id="replay-slider" min="0" max="100" value="0">
+                    <button id="exit-replay-btn" class="btn danger-btn">Esci</button>
+                </div>
+            </div>
+            
+            <div class="replay-container">
+                <canvas id="replay-canvas"></canvas>
+            </div>
+        </div>
+        
+        <!-- Schermata Editor Mappe -->
+        <div id="map-editor-screen" class="screen hidden">
+            <div class="editor-header">
+                <h1>Editor Mappe</h1>
+                <div class="editor-controls">
+                    <button id="save-map-btn" class="btn primary-btn">Salva</button>
+                    <button id="load-map-btn" class="btn secondary-btn">Carica</button>
+                    <button id="exit-editor-btn" class="btn danger-btn">Esci</button>
+                </div>
+            </div>
+            
+            <div class="editor-container">
+                <div class="editor-tools">
+                    <button class="tool-btn active" data-tool="wall">Muro</button>
+                    <button class="tool-btn" data-tool="goal">Porta</button>
+                    <button class="tool-btn" data-tool="spawn">Spawn</button>
+                    <button class="tool-btn" data-tool="erase">Cancella</button>
+                </div>
+                
+                <canvas id="editor-canvas"></canvas>
+            </div>
+        </div>
+        
+        <!-- Notifica -->
+        <div id="notification" class="notification hidden">
+            <span id="notification-message"></span>
+        </div>
+    </div>
+    
+    <!-- Socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <!-- Script -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/replay.js"></script>
+    <script src="js/mapEditor.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
