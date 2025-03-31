@@ -378,158 +378,164 @@ const UI = {
     },
     
     // Gestisce il login
-    handleLogin: () => {
-        const username = UI.elements.login.loginUsername.value.trim();
-        const password = UI.elements.login.loginPassword.value;
-        
-        if (!username || !password) {
-            Utils.showNotification('Inserisci username e password');
-            return;
+handleLogin: () => {
+    const username = UI.elements.login.loginUsername.value.trim();
+    const password = UI.elements.login.loginPassword.value;
+    
+    if (!username || !password) {
+        Utils.showNotification('Inserisci username e password');
+        return;
+    }
+    
+    socket.emit('login', { username, password }, (response) => {
+        if (response.success) {
+            UI.state.currentUser = {
+                username: response.user.username,
+                email: response.user.email,
+                mmr: response.user.mmr
+            };
+            
+            UI.elements.lobby.userDisplay.textContent = response.user.username;
+            UI.elements.lobby.mmrDisplay.textContent = `MMR: ${response.user.mmr.global}`;
+            
+            Utils.saveToStorage('username', response.user.username);
+            Utils.saveToStorage('password', password);
+            
+            UI.showScreen('lobby');
+            Utils.showNotification(`Benvenuto, ${response.user.username}!`);
+        } else {
+            Utils.showNotification(response.message || 'Errore durante il login');
         }
-        
-        socket.emit('login', { username, password }, (response) => {
-            if (response.success) {
-                UI.state.currentUser = response.user;
-                UI.elements.lobby.userDisplay.textContent = response.user.username;
-                UI.elements.lobby.mmrDisplay.textContent = `MMR: ${response.user.mmr.global}`;
-                
-                // Salva i dati utente
-                Utils.saveToStorage('username', response.user.username);
-                Utils.saveToStorage('password', password);
-                
-                UI.showScreen('lobby');
-                Utils.showNotification(`Benvenuto, ${response.user.username}!`);
-            } else {
-                Utils.showNotification(response.message);
-            }
-        });
-    },
+    });
+},
     
     // Mostra il profilo utente
-    showProfile: () => {
-        if (!UI.state.currentUser) {
-            Utils.showNotification('Utente non autenticato');
-            return;
-        }
-        
-        // Carica i dati del profilo
-        socket.emit('getProfile', UI.state.currentUser.username, (response) => {
-            if (response.success) {
-                const profile = response.profile;
-                
-                UI.elements.profile.username.value = profile.username;
-                UI.elements.profile.email.value = profile.email;
-                UI.elements.profile.mmrGlobal.textContent = profile.mmr.global;
-                UI.elements.profile.mmr1v1.textContent = profile.mmr['1v1'];
-                UI.elements.profile.mmr2v2.textContent = profile.mmr['2v2'];
-                UI.elements.profile.mmr3v3.textContent = profile.mmr['3v3'];
-                
-                UI.elements.profile.currentPassword.value = '';
-                UI.elements.profile.newPassword.value = '';
-                UI.elements.profile.confirmPassword.value = '';
-                
-                UI.showScreen('profile');
-            } else {
-                Utils.showNotification(response.message);
-            }
-        });
-    },
+showProfile: () => {
+    if (!UI.state.currentUser || !UI.state.currentUser.username) {
+        Utils.showNotification('Utente non autenticato');
+        return;
+    }
     
-    // Salva le modifiche al profilo
-    saveProfile: () => {
-        const newUsername = UI.elements.profile.username.value.trim();
-        const currentPassword = UI.elements.profile.currentPassword.value;
-        const newPassword = UI.elements.profile.newPassword.value;
-        const confirmPassword = UI.elements.profile.confirmPassword.value;
-        
-        if (!currentPassword) {
-            Utils.showNotification('Inserisci la password attuale per confermare le modifiche');
-            return;
+    socket.emit('getProfile', UI.state.currentUser.username, (response) => {
+        if (response.success) {
+            const profile = response.profile;
+            
+            UI.elements.profile.username.value = profile.username;
+            UI.elements.profile.email.value = profile.email;
+            
+            UI.elements.profile.mmrGlobal.textContent = profile.mmr.global;
+            UI.elements.profile.mmr1v1.textContent = profile.mmr['1v1'];
+            UI.elements.profile.mmr2v2.textContent = profile.mmr['2v2'];
+            UI.elements.profile.mmr3v3.textContent = profile.mmr['3v3'];
+            
+            UI.elements.profile.currentPassword.value = '';
+            UI.elements.profile.newPassword.value = '';
+            UI.elements.profile.confirmPassword.value = '';
+            
+            UI.showScreen('profile');
+        } else {
+            Utils.showNotification(response.message || 'Impossibile caricare il profilo');
         }
+    });
+},    
+    // Salva le modifiche al profilo
+saveProfile: () => {
+    const newUsername = UI.elements.profile.username.value.trim();
+    const currentPassword = UI.elements.profile.currentPassword.value;
+    const newPassword = UI.elements.profile.newPassword.value;
+    const confirmPassword = UI.elements.profile.confirmPassword.value;
+    
+    if (!currentPassword) {
+        Utils.showNotification('Inserisci la password attuale per confermare le modifiche');
+        return;
+    }
+
         
         // Controlla se l'username è cambiato
-        if (newUsername !== UI.state.currentUser.username) {
-            // Cambia username
-            fetch('/api/change-username', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    currentUsername: UI.state.currentUser.username,
-                    newUsername,
-                    password: currentPassword
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    UI.state.currentUser = data.user;
-                    UI.elements.lobby.userDisplay.textContent = data.user.username;
-                    
-                    // Aggiorna i dati salvati
-                    Utils.saveToStorage('username', data.user.username);
-                    
-                    Utils.showNotification('Username cambiato con successo');
-                    
-                    // Controlla se è necessario cambiare anche la password
-                    if (newPassword) {
-                        UI.changePassword(newUsername, currentPassword, newPassword, confirmPassword);
-                    } else {
-                        UI.showScreen('lobby');
-                    }
-                } else {
-                    Utils.showNotification(data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Errore durante il cambio username:', error);
-                Utils.showNotification('Errore durante il cambio username. Riprova più tardi.');
-            });
-        } else if (newPassword) {
-            // Cambia solo la password
-            UI.changePassword(UI.state.currentUser.username, currentPassword, newPassword, confirmPassword);
-        } else {
-            // Nessuna modifica
-            UI.showScreen('lobby');
-        }
-    },
-    
-    // Cambia la password
-    changePassword: (username, currentPassword, newPassword, confirmPassword) => {
-        if (newPassword !== confirmPassword) {
-            Utils.showNotification('Le nuove password non corrispondono');
-            return;
-        }
-        
-        fetch('/api/change-password', {
+   if (newUsername !== UI.state.currentUser.username) {
+        fetch('/api/change-username', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                username,
-                currentPassword,
-                newPassword
+                currentUsername: UI.state.currentUser.username,
+                newUsername,
+                password: currentPassword
             })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Aggiorna i dati salvati
-                Utils.saveToStorage('password', newPassword);
+                UI.state.currentUser = {
+                    ...UI.state.currentUser,
+                    username: data.user.username
+                };
                 
-                Utils.showNotification('Password cambiata con successo');
-                UI.showScreen('lobby');
+                UI.elements.lobby.userDisplay.textContent = data.user.username;
+                
+                Utils.saveToStorage('username', data.user.username);
+                
+                Utils.showNotification('Username cambiato con successo');
+                
+                if (newPassword) {
+                    UI.changePassword(newUsername, currentPassword, newPassword, confirmPassword);
+                } else {
+                    UI.showScreen('lobby');
+                }
             } else {
-                Utils.showNotification(data.message);
+                Utils.showNotification(data.message || 'Errore durante il cambio username');
             }
         })
         .catch(error => {
-            console.error('Errore durante il cambio password:', error);
-            Utils.showNotification('Errore durante il cambio password. Riprova più tardi.');
+            console.error('Errore durante il cambio username:', error);
+            Utils.showNotification('Errore durante il cambio username. Riprova più tardi.');
         });
-    },
+    } else if (newPassword) {
+        // Cambia solo la password
+        UI.changePassword(UI.state.currentUser.username, currentPassword, newPassword, confirmPassword);
+    } else {
+        // Nessuna modifica
+        UI.showScreen('lobby');
+    }
+},
+
+    
+    // Cambia la password
+changePassword: (username, currentPassword, newPassword, confirmPassword) => {
+    if (newPassword !== confirmPassword) {
+        Utils.showNotification('Le nuove password non corrispondono');
+        return;
+    }
+    
+    fetch('/api/change-password', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            username,
+            currentPassword,
+            newPassword
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Utils.saveToStorage('password', newPassword);
+            
+            Utils.showNotification('Password cambiata con successo');
+            UI.showScreen('lobby');
+        } else {
+            Utils.showNotification(data.message || 'Errore durante il cambio password');
+        }
+    })
+    .catch(error => {
+        console.error('Errore durante il cambio password:', error);
+        Utils.showNotification('Errore durante il cambio password. Riprova più tardi.');
+    });
+},
+
     
     // Aggiorna la lista delle stanze
     refreshRooms: () => {
