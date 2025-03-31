@@ -325,8 +325,8 @@ function setupEmailTransporter() {
           port: 465,
           secure: true,
           auth: {
-            user: postmaster@easypcpisa.it,
-            pass: @#R0x3rn3t!@#
+            user: 'x',
+            pass: 'x'
           }
         });
         
@@ -349,8 +349,8 @@ function setupEmailTransporter() {
       port: 465,
       secure: true,
       auth: {
-        user: 'postmaster@easypcpisa.it', // Cambia con le tue credenziali reali
-        pass: '@#R0x3rn3t!@#'
+        user: 'x', // Cambia con le tue credenziali reali
+        pass: 'x'
       }
     });
     
