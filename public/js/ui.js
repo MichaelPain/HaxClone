@@ -962,3 +962,65 @@ changePassword: (username, currentPassword, newPassword, confirmPassword) => {
             console.error('Errore durante la registrazione:', error);
             Utils.showNotification('Errore durante la registrazione. Riprova più tardi.');
         });
+
+    // Metodo per caricare le classifiche
+    loadRankings: (type) => {
+        socket.emit('getRankings', type, (rankings) => {
+            let rankingsList;
+            
+            switch (type) {
+                case 'global':
+                    rankingsList = UI.elements.lobby.globalRankingsList;
+                    break;
+                case '1v1':
+                    rankingsList = UI.elements.lobby.oneVOneRankingsList;
+                    break;
+                case '2v2':
+                    rankingsList = UI.elements.lobby.twoVTwoRankingsList;
+                    break;
+                case '3v3':
+                    rankingsList = UI.elements.lobby.threeVThreeRankingsList;
+                    break;
+                default:
+                    return;
+            }
+            
+            rankingsList.innerHTML = '';
+            
+            if (rankings.length === 0) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = '<td colspan="3">Nessun giocatore in classifica</td>';
+                rankingsList.appendChild(emptyRow);
+                return;
+            }
+            
+            rankings.forEach((player, index) => {
+                const row = document.createElement('tr');
+                
+                const posCell = document.createElement('td');
+                posCell.textContent = index + 1;
+                
+                const nameCell = document.createElement('td');
+                nameCell.textContent = player.name;
+                
+                if (player.name === UI.state.currentUser?.username) {
+                    row.classList.add('current-player-row');
+                }
+                
+                const mmrCell = document.createElement('td');
+                mmrCell.textContent = player.mmr;
+                
+                row.appendChild(posCell);
+                row.appendChild(nameCell);
+                row.appendChild(mmrCell);
+                
+                rankingsList.appendChild(row);
+            });
+        });
+    }
+}; // Chiusura dell'oggetto UI
+
+// Inizializza l'interfaccia quando il documento è caricato
+document.addEventListener('DOMContentLoaded', () => {
+    UI.init();
+});
