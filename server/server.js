@@ -456,7 +456,7 @@ app.get('/api/test/email', (req, res) => {
   
   // Invia un'email di test
   const mailOptions = {
-    from: '"HaxBall Clone Test" <noreply@haxballclone.com>',
+    from: '"HaxBall Clone Test" <postmaster@easypcpisa.it>',
     to: testEmail,
     subject: 'Test email da HaxBall Clone',
     html: '<h1>Questa è un\'email di test</h1><p>Se stai vedendo questa email, la configurazione del server email funziona correttamente.</p>'
@@ -527,7 +527,7 @@ app.post('/api/register', (req, res) => {
   
   // Invia l'email di verifica
   const mailOptions = {
-    from: '"HaxBall Clone" <noreply@haxballclone.com>',
+    from: '"HaxBall Clone" <postmaster@easypcpisa.it>',
     to: email,
     subject: 'Verifica il tuo account HaxBall Clone',
     html: `
