@@ -39,6 +39,7 @@ class GameRoom {
     this.p2pConnections = {}; // Connessioni P2P tra i giocatori
     this.playerStats = {}; // Statistiche dei giocatori (ping, velocità connessione)
     this.isPaused = false; // Indica se la partita è in pausa
+    this.lastActivity = Date.now(); // Timestamp dell'ultima attività nella stanza
   }
 
     addPlayer(playerId, playerName) {
@@ -55,6 +56,7 @@ class GameRoom {
       };
 
       this.spectators.push(playerId);
+      this.lastActivity = Date.now(); // Aggiorna il timestamp dell'ultima attività
       return true;
     }
 
@@ -82,6 +84,8 @@ class GameRoom {
       if (playerId === this.host) {
         this.assignNewHost();
       }
+      
+      this.lastActivity = Date.now(); // Aggiorna il timestamp dell'ultima attività
     }
 
     assignNewHost() {
@@ -119,6 +123,7 @@ class GameRoom {
 
       // Aggiorna il team del giocatore
       player.team = team;
+      this.lastActivity = Date.now(); // Aggiorna il timestamp dell'ultima attività
     }
 
     startGame() {
@@ -127,8 +132,20 @@ class GameRoom {
       }
 
       this.gameStarted = true;
+      this.lastActivity = Date.now(); // Aggiorna il timestamp dell'ultima attività
       // Notifica tutti i giocatori dell'inizio del gioco
       io.to(this.id).emit('gameStarted');
+    }
+    
+    stopGame() {
+      if (!this.gameStarted) {
+        return;
+      }
+      
+      this.gameStarted = false;
+      this.lastActivity = Date.now(); // Aggiorna il timestamp dell'ultima attività
+      // Notifica tutti i giocatori dell'interruzione del gioco
+      io.to(this.id).emit('gameStopped');
     }
 
     getPublicData() {
@@ -790,7 +807,7 @@ io.on('connection', (socket) => {
   
   // Crea una stanza
   socket.on('createRoom', (data, callback) => {
-    const { name, maxPlayers, isPrivate, password, isRanked, gameMode, username } = data;
+    const { name, maxPlayers, isPrivate, password, isRanked, gameMode, username, isHosted } = data;
     
     // Verifica che i dati siano validi
     if (!name || !username) {
@@ -811,7 +828,7 @@ io.on('connection', (socket) => {
       isRanked || false,
       maxPlayers || 10,
       gameMode || null,
-      true // isHosted (tutte le stanze sono ora P2P)
+      isHosted !== undefined ? isHosted : true // isHosted (default: true per P2P)
     );
     
     // Aggiungi il giocatore alla stanza
@@ -959,6 +976,47 @@ io.on('connection', (socket) => {
     });
   });
   
+  // Sposta un giocatore in un altro team (solo per l'host)
+  socket.on('movePlayer', (data) => {
+    const { roomId, playerId, team } = data;
+    
+    // Verifica che i dati siano validi
+    if (!roomId || !playerId || !team) {
+      return;
+    }
+    
+    // Verifica che la stanza esista
+    if (!rooms[roomId]) {
+      return;
+    }
+    
+    const room = rooms[roomId];
+    
+    // Verifica che il giocatore sia l'host
+    if (room.host !== socket.id) {
+      return;
+    }
+    
+    // Verifica che il giocatore da spostare sia nella stanza
+    if (!room.players[playerId]) {
+      return;
+    }
+    
+    // Verifica che il team sia valido
+    if (team !== 'red' && team !== 'blue' && team !== 'spectator') {
+      return;
+    }
+    
+    // Cambia il team del giocatore
+    room.changeTeam(playerId, team);
+    
+    // Notifica tutti i giocatori
+    io.to(roomId).emit('teamChanged', {
+      playerId: playerId,
+      team: team
+    });
+  });
+  
   // Avvia la partita
   socket.on('startGame', (roomId) => {
     // Verifica che la stanza esista
@@ -980,6 +1038,29 @@ io.on('connection', (socket) => {
     
     // Avvia la partita
     room.startGame();
+  });
+  
+  // Interrompi la partita (solo per l'host)
+  socket.on('stopGame', (roomId) => {
+    // Verifica che la stanza esista
+    if (!rooms[roomId]) {
+      return;
+    }
+    
+    const room = rooms[roomId];
+    
+    // Verifica che il giocatore sia l'host
+    if (room.host !== socket.id) {
+      return;
+    }
+    
+    // Verifica che la partita sia in corso
+    if (!room.gameStarted) {
+      return;
+    }
+    
+    // Interrompi la partita
+    room.stopGame();
   });
   
   // Aggiorna l'input del giocatore
@@ -1154,15 +1235,77 @@ io.on('connection', (socket) => {
         // Rimuovi il giocatore dalla stanza
         room.removePlayer(socket.id);
         
-        // Se la stanza è vuota, rimuovila
+        // Se la stanza è vuota, non rimuoverla immediatamente ma imposta un timeout
         if (Object.keys(room.players).length === 0) {
-          transferManager.removeRoom(roomId);
-          delete rooms[roomId];
+          // Per le stanze normali (non ranked), imposta un timeout di 5 minuti
+          if (!room.isRanked) {
+            console.log(`Stanza ${roomId} vuota, sarà rimossa tra 5 minuti se nessuno si unisce`);
+            // Non rimuovere immediatamente, verrà gestito dal cleanup periodico
+          } else {
+            // Per le stanze ranked, rimuovi immediatamente
+            transferManager.removeRoom(roomId);
+            delete rooms[roomId];
+          }
         }
       }
     });
   });
+  
+  // Esci dalla stanza
+  socket.on('leaveRoom', (roomId) => {
+    // Verifica che la stanza esista
+    if (!rooms[roomId]) {
+      return;
+    }
+    
+    const room = rooms[roomId];
+    
+    // Verifica che il giocatore sia nella stanza
+    if (!room.players[socket.id]) {
+      return;
+    }
+    
+    // Notifica gli altri giocatori
+    socket.to(roomId).emit('playerLeft', {
+      id: socket.id,
+      name: room.players[socket.id].name
+    });
+    
+    // Rimuovi il giocatore dalla stanza
+    room.removePlayer(socket.id);
+    
+    // Esci dalla stanza socket.io
+    socket.leave(roomId);
+    
+    // Se la stanza è vuota, non rimuoverla immediatamente ma imposta un timeout
+    if (Object.keys(room.players).length === 0) {
+      // Per le stanze normali (non ranked), imposta un timeout di 5 minuti
+      if (!room.isRanked) {
+        console.log(`Stanza ${roomId} vuota, sarà rimossa tra 5 minuti se nessuno si unisce`);
+        // Non rimuovere immediatamente, verrà gestito dal cleanup periodico
+      } else {
+        // Per le stanze ranked, rimuovi immediatamente
+        transferManager.removeRoom(roomId);
+        delete rooms[roomId];
+      }
+    }
+  });
 });
+
+// Pulizia periodica delle stanze vuote (ogni minuto)
+setInterval(() => {
+  const now = Date.now();
+  Object.keys(rooms).forEach(roomId => {
+    const room = rooms[roomId];
+    
+    // Se la stanza è vuota e l'ultima attività è stata più di 5 minuti fa, rimuovila
+    if (Object.keys(room.players).length === 0 && now - room.lastActivity > 5 * 60 * 1000) {
+      console.log(`Rimozione stanza vuota ${roomId} dopo 5 minuti di inattività`);
+      transferManager.removeRoom(roomId);
+      delete rooms[roomId];
+    }
+  });
+}, 60 * 1000); // Controlla ogni minuto
 
 // Avvia il server
 const PORT = process.env.PORT || 3000;

@@ -19,16 +19,24 @@ const Game = {
     
     // Inizializza il gioco
     init: () => {
-        // Inizializza il canvas
-        Game.canvas = document.getElementById('game-canvas');
-        Game.ctx = Game.canvas.getContext('2d');
-        
-        // Imposta le dimensioni del canvas
-        Game.canvas.width = CONFIG.CANVAS_WIDTH;
-        Game.canvas.height = CONFIG.CANVAS_HEIGHT;
-        
         // Configura gli event listener per i controlli
         Game.setupControls();
+    },
+    
+    // Inizializza il canvas quando il gioco viene avviato
+    initCanvas: () => {
+        // Inizializza il canvas solo se non è già stato inizializzato
+        if (!Game.canvas) {
+            Game.canvas = document.getElementById('game-canvas');
+            if (Game.canvas) {
+                Game.ctx = Game.canvas.getContext('2d');
+                
+                // Imposta le dimensioni del canvas
+                Game.canvas.width = CONFIG.CANVAS_WIDTH;
+                Game.canvas.height = CONFIG.CANVAS_HEIGHT;
+            }
+        }
+        return Game.canvas && Game.ctx;
     },
     
     // Configura i controlli
@@ -132,6 +140,12 @@ const Game = {
         // Ferma eventuali rendering precedenti
         Game.stopRendering();
         
+        // Inizializza il canvas se non è già stato fatto
+        if (!Game.initCanvas()) {
+            console.error("Impossibile inizializzare il canvas per il rendering");
+            return;
+        }
+        
         // Avvia il ping al server
         Game.startPinging();
         
@@ -203,6 +217,12 @@ const Game = {
     
     // Renderizza il gioco
     render: () => {
+        // Verifica che il canvas e il contesto siano disponibili
+        if (!Game.canvas || !Game.ctx) {
+            console.error("Canvas o contesto non disponibili per il rendering");
+            return;
+        }
+        
         // Pulisci il canvas
         Game.ctx.fillStyle = CONFIG.COLORS.BACKGROUND;
         Game.ctx.fillRect(0, 0, Game.canvas.width, Game.canvas.height);
@@ -250,19 +270,109 @@ const Game = {
     
     // Renderizza le porte
     renderGoals: () => {
+        const goalDepth = 30; // Profondità delle porte
+        
+        // Disegna le linee del campo
+        Game.ctx.strokeStyle = CONFIG.COLORS.FIELD_LINES;
+        Game.ctx.lineWidth = 2;
+        
+        // Linea di centrocampo
+        Game.ctx.beginPath();
+        Game.ctx.moveTo(Game.canvas.width / 2, 0);
+        Game.ctx.lineTo(Game.canvas.width / 2, Game.canvas.height);
+        Game.ctx.stroke();
+        
+        // Cerchio di centrocampo
+        Game.ctx.beginPath();
+        Game.ctx.arc(Game.canvas.width / 2, Game.canvas.height / 2, 50, 0, Math.PI * 2);
+        Game.ctx.stroke();
+        
         // Porta sinistra (rossa)
         Game.ctx.strokeStyle = CONFIG.COLORS.RED_TEAM;
-        Game.ctx.lineWidth = 2;
+        Game.ctx.lineWidth = 3;
+        
+        // Linea verticale superiore
         Game.ctx.beginPath();
         Game.ctx.moveTo(CONFIG.WALL_THICKNESS, (Game.canvas.height - CONFIG.GOAL_WIDTH) / 2);
-        Game.ctx.lineTo(CONFIG.WALL_THICKNESS, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.lineTo(CONFIG.WALL_THICKNESS - goalDepth, (Game.canvas.height - CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.stroke();
+        
+        // Linea verticale inferiore
+        Game.ctx.beginPath();
+        Game.ctx.moveTo(CONFIG.WALL_THICKNESS, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.lineTo(CONFIG.WALL_THICKNESS - goalDepth, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.stroke();
+        
+        // Linea orizzontale (fondo porta)
+        Game.ctx.beginPath();
+        Game.ctx.moveTo(CONFIG.WALL_THICKNESS - goalDepth, (Game.canvas.height - CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.lineTo(CONFIG.WALL_THICKNESS - goalDepth, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.stroke();
+        
+        // Pali della porta (gialli)
+        Game.ctx.strokeStyle = CONFIG.COLORS.GOAL_POST;
+        Game.ctx.lineWidth = 4;
+        
+        // Palo superiore
+        Game.ctx.beginPath();
+        Game.ctx.moveTo(CONFIG.WALL_THICKNESS, (Game.canvas.height - CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.lineTo(CONFIG.WALL_THICKNESS - goalDepth, (Game.canvas.height - CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.stroke();
+        
+        // Palo inferiore
+        Game.ctx.beginPath();
+        Game.ctx.moveTo(CONFIG.WALL_THICKNESS, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.lineTo(CONFIG.WALL_THICKNESS - goalDepth, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.stroke();
+        
+        // Traversa
+        Game.ctx.beginPath();
+        Game.ctx.moveTo(CONFIG.WALL_THICKNESS - goalDepth, (Game.canvas.height - CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.lineTo(CONFIG.WALL_THICKNESS - goalDepth, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
         Game.ctx.stroke();
         
         // Porta destra (blu)
         Game.ctx.strokeStyle = CONFIG.COLORS.BLUE_TEAM;
+        Game.ctx.lineWidth = 3;
+        
+        // Linea verticale superiore
         Game.ctx.beginPath();
         Game.ctx.moveTo(Game.canvas.width - CONFIG.WALL_THICKNESS, (Game.canvas.height - CONFIG.GOAL_WIDTH) / 2);
-        Game.ctx.lineTo(Game.canvas.width - CONFIG.WALL_THICKNESS, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.lineTo(Game.canvas.width - CONFIG.WALL_THICKNESS + goalDepth, (Game.canvas.height - CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.stroke();
+        
+        // Linea verticale inferiore
+        Game.ctx.beginPath();
+        Game.ctx.moveTo(Game.canvas.width - CONFIG.WALL_THICKNESS, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.lineTo(Game.canvas.width - CONFIG.WALL_THICKNESS + goalDepth, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.stroke();
+        
+        // Linea orizzontale (fondo porta)
+        Game.ctx.beginPath();
+        Game.ctx.moveTo(Game.canvas.width - CONFIG.WALL_THICKNESS + goalDepth, (Game.canvas.height - CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.lineTo(Game.canvas.width - CONFIG.WALL_THICKNESS + goalDepth, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.stroke();
+        
+        // Pali della porta (gialli)
+        Game.ctx.strokeStyle = CONFIG.COLORS.GOAL_POST;
+        Game.ctx.lineWidth = 4;
+        
+        // Palo superiore
+        Game.ctx.beginPath();
+        Game.ctx.moveTo(Game.canvas.width - CONFIG.WALL_THICKNESS, (Game.canvas.height - CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.lineTo(Game.canvas.width - CONFIG.WALL_THICKNESS + goalDepth, (Game.canvas.height - CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.stroke();
+        
+        // Palo inferiore
+        Game.ctx.beginPath();
+        Game.ctx.moveTo(Game.canvas.width - CONFIG.WALL_THICKNESS, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.lineTo(Game.canvas.width - CONFIG.WALL_THICKNESS + goalDepth, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.stroke();
+        
+        // Traversa
+        Game.ctx.beginPath();
+        Game.ctx.moveTo(Game.canvas.width - CONFIG.WALL_THICKNESS + goalDepth, (Game.canvas.height - CONFIG.GOAL_WIDTH) / 2);
+        Game.ctx.lineTo(Game.canvas.width - CONFIG.WALL_THICKNESS + goalDepth, (Game.canvas.height + CONFIG.GOAL_WIDTH) / 2);
         Game.ctx.stroke();
     },
     
@@ -396,25 +506,52 @@ const Game = {
         
         const ball = Game.state.ball;
         
+        // Disegna l'ombra della palla
+        Game.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        Game.ctx.beginPath();
+        Game.ctx.arc(ball.x + 2, ball.y + 2, CONFIG.BALL_RADIUS, 0, Math.PI * 2);
+        Game.ctx.fill();
+        
+        // Disegna la palla
         Game.ctx.fillStyle = CONFIG.COLORS.BALL;
         Game.ctx.beginPath();
         Game.ctx.arc(ball.x, ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2);
         Game.ctx.fill();
         
-        // Disegna pattern della palla
+        // Disegna pattern della palla (stile pallone da calcio)
         Game.ctx.strokeStyle = '#000000';
         Game.ctx.lineWidth = 1;
         
-        // Linea orizzontale
-        Game.ctx.beginPath();
-        Game.ctx.moveTo(ball.x - CONFIG.BALL_RADIUS, ball.y);
-        Game.ctx.lineTo(ball.x + CONFIG.BALL_RADIUS, ball.y);
-        Game.ctx.stroke();
+        // Pentagoni neri
+        const segments = 5;
+        const angleStep = (Math.PI * 2) / segments;
         
-        // Linea verticale
+        for (let i = 0; i < segments; i++) {
+            const angle = i * angleStep;
+            const innerRadius = CONFIG.BALL_RADIUS * 0.5;
+            
+            Game.ctx.fillStyle = '#000000';
+            Game.ctx.beginPath();
+            Game.ctx.moveTo(
+                ball.x + innerRadius * Math.cos(angle),
+                ball.y + innerRadius * Math.sin(angle)
+            );
+            
+            for (let j = 1; j <= segments; j++) {
+                const pointAngle = angle + (j * angleStep);
+                Game.ctx.lineTo(
+                    ball.x + innerRadius * Math.cos(pointAngle),
+                    ball.y + innerRadius * Math.sin(pointAngle)
+                );
+            }
+            
+            Game.ctx.fill();
+        }
+        
+        // Riflesso (effetto 3D)
+        Game.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
         Game.ctx.beginPath();
-        Game.ctx.moveTo(ball.x, ball.y - CONFIG.BALL_RADIUS);
-        Game.ctx.lineTo(ball.x, ball.y + CONFIG.BALL_RADIUS);
-        Game.ctx.stroke();
+        Game.ctx.arc(ball.x - CONFIG.BALL_RADIUS * 0.3, ball.y - CONFIG.BALL_RADIUS * 0.3, CONFIG.BALL_RADIUS * 0.4, 0, Math.PI * 2);
+        Game.ctx.fill();
     }
 };

@@ -682,3 +682,55 @@ th {
         grid-template-columns: 1fr;
     }
 }
+
+/* Aggiungi stili per i pulsanti mini per spostare i giocatori */
+.move-player-buttons {
+    display: inline-flex;
+    margin-left: 10px;
+}
+
+.mini-btn {
+    font-size: 10px;
+    padding: 2px 4px;
+    margin: 0 2px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+/* Stile per il pulsante di avviso (warning) */
+.warning-btn {
+    background-color: #f39c12;
+    color: white;
+    border: none;
+}
+
+.warning-btn:hover {
+    background-color: #e67e22;
+}
+
+/* Stile per il container del link della stanza */
+.room-link-container {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+}
+
+.room-link {
+    display: flex;
+    align-items: center;
+}
+
+.room-link input {
+    flex-grow: 1;
+    margin-right: 10px;
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+/* Stile per i pulsanti disabilitati */
+.btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

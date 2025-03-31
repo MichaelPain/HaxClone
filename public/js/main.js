@@ -44,7 +44,48 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 1000);
         }
     });
+    
+    // Controlla se c'è un parametro di join nell'URL
+    checkJoinParameter();
 });
+
+// Controlla se c'è un parametro di join nell'URL
+function checkJoinParameter() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('join');
+    
+    if (roomId) {
+        // Rimuovi il parametro dall'URL senza ricaricare la pagina
+        const newUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, newUrl);
+        
+        // Memorizza l'ID della stanza per unirsi dopo il login
+        localStorage.setItem('pendingRoomJoin', roomId);
+        
+        // Se l'utente è già loggato, unisciti alla stanza
+        if (UI.state.currentUser) {
+            joinRoomFromLink(roomId);
+        } else {
+            Utils.showNotification('Effettua il login per unirti alla stanza');
+        }
+    }
+}
+
+// Unisciti a una stanza tramite link
+function joinRoomFromLink(roomId) {
+    // Rimuovi l'ID della stanza in attesa
+    localStorage.removeItem('pendingRoomJoin');
+    
+    // Controlla se la stanza esiste
+    socket.emit('checkRoom', { roomId }, (response) => {
+        if (response.exists) {
+            // Unisciti alla stanza
+            UI.joinRoom(roomId);
+        } else {
+            Utils.showNotification('La stanza non esiste più');
+        }
+    });
+}
 
 // Inizializza la connessione socket
 function initSocket() {
@@ -76,6 +117,12 @@ function initSocket() {
                         
                         UI.showScreen('lobby');
                         Utils.showNotification(`Bentornato, ${response.user.username}!`);
+                        
+                        // Controlla se c'è una stanza in attesa di join
+                        const pendingRoomId = localStorage.getItem('pendingRoomJoin');
+                        if (pendingRoomId) {
+                            joinRoomFromLink(pendingRoomId);
+                        }
                     }
                 });
             }
