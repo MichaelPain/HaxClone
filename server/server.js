@@ -8,7 +8,6 @@ const Matter = require('matter-js');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const fs = require('fs');
-const { Engine, World, Bodies, Body, Events } = require('matter-js');
 
 // Importa i nuovi moduli
 // Nota: questi moduli sono referenziati ma non sono inclusi nella tua struttura di file originale
@@ -188,7 +187,6 @@ class GameRoom {
       
       return connections;
     }
-  }
 }
 
 // Crea un semplice gestore di trasferimento se non è stato importato
