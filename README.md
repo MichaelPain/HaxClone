@@ -86,24 +86,24 @@ Copyhaxball-clone/
 │   │   ├── main.js       # Punto di ingresso dell'applicazione  
 │   │   ├── mapEditor.js  # Editor di mappe personalizzate  
 │   │   ├── readyCheck.js # Componente per il ready check dopo il cambio di host  
-│   │   ├── replay.js     # Sistema di replay
-│   │   ├── ui.js         # Gestione dell'interfaccia utente
-│   │   └── utils.js      # Funzioni di utilità
-│   └── index.html        # Pagina HTML principale
-├── server/               # File server-side
-│   ├── gameRoom.js       # Classe per gestire le stanze di gioco
-│   ├── hostSelection.js  # Sistema di selezione dell'host per partite P2P
-│   ├── hostTransfer.js   # Sistema di trasferimento dell'host per partite P2P
-│   ├── lagDetection.js   # Sistema di rilevamento del lag per partite P2P
-│   └── server.js         # Server Node.js con logica di gioco
-├── shared/               # File condivisi tra client e server
-├── data/                 # Dati persistenti
-│   ├── rankings.json     # Dati delle classifiche
-│   └── users.json        # Dati degli utenti
-├── package-lock.json     # Lock file delle dipendenze
-├── package.json          # Configurazione npm e dipendenze
-├── README-UPDATED.md     # Questa documentazione aggiornata
-└── README.md             # Documentazione originale del progetto
+│   │   ├── replay.js     # Sistema di replay  
+│   │   ├── ui.js         # Gestione dell'interfaccia utente  
+│   │   └── utils.js      # Funzioni di utilità  
+│   └── index.html        # Pagina HTML principale  
+├── server/               # File server-side  
+│   ├── gameRoom.js       # Classe per gestire le stanze di gioco  
+│   ├── hostSelection.js  # Sistema di selezione dell'host per partite P2P  
+│   ├── hostTransfer.js   # Sistema di trasferimento dell'host per partite P2P  
+│   ├── lagDetection.js   # Sistema di rilevamento del lag per partite P2P  
+│   └── server.js         # Server Node.js con logica di gioco  
+├── shared/               # File condivisi tra client e server  
+├── data/                 # Dati persistenti  
+│   ├── rankings.json     # Dati delle classifiche  
+│   └── users.json        # Dati degli utenti  
+├── package-lock.json     # Lock file delle dipendenze  
+├── package.json          # Configurazione npm e dipendenze  
+├── README-UPDATED.md     # Questa documentazione aggiornata  
+└── README.md             # Documentazione originale del progetto  
 
 
 Requisiti
