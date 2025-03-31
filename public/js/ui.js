@@ -253,8 +253,16 @@ const UI = {
         UI.elements.game.exitGameBtn.addEventListener('click', UI.exitGame);
         
         // Replay
-        UI.elements.replay.playPauseBtn.addEventListener('click', Replay.togglePlayback);
-        UI.elements.replay.slider.addEventListener('input', Replay.seekToPosition);
+        UI.elements.replay.playPauseBtn.addEventListener('click', () => {
+            if (typeof Replay !== 'undefined' && Replay.togglePlayback) {
+                Replay.togglePlayback();
+            }
+        });
+        UI.elements.replay.slider.addEventListener('input', () => {
+            if (typeof Replay !== 'undefined' && Replay.seek) {
+                Replay.seek(parseInt(UI.elements.replay.slider.value));
+            }
+        });
         UI.elements.replay.exitBtn.addEventListener('click', () => UI.showScreen('lobby'));
         
         // Editor di mappe
@@ -264,12 +272,22 @@ const UI = {
                 UI.elements.mapEditor.toolBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 UI.state.selectedTool = tool;
-                MapEditor.selectTool(tool);
+                if (typeof MapEditor !== 'undefined' && MapEditor.selectTool) {
+                    MapEditor.selectTool(tool);
+                }
             });
         });
         
-        UI.elements.mapEditor.saveBtn.addEventListener('click', MapEditor.saveMap);
-        UI.elements.mapEditor.loadBtn.addEventListener('click', MapEditor.loadMap);
+        UI.elements.mapEditor.saveBtn.addEventListener('click', () => {
+            if (typeof MapEditor !== 'undefined' && MapEditor.saveMap) {
+                MapEditor.saveMap();
+            }
+        });
+        UI.elements.mapEditor.loadBtn.addEventListener('click', () => {
+            if (typeof MapEditor !== 'undefined' && MapEditor.loadMap) {
+                MapEditor.loadMap();
+            }
+        });
         UI.elements.mapEditor.exitBtn.addEventListener('click', () => UI.showScreen('lobby'));
     },
     
@@ -345,11 +363,17 @@ const UI = {
                 }
             }
         } else if (screenName === 'game') {
-            Game.startRendering();
+            if (typeof Game !== 'undefined' && Game.startRendering) {
+                Game.startRendering();
+            }
         } else if (screenName === 'replay') {
-            Replay.init();
+            if (typeof Replay !== 'undefined' && Replay.init) {
+                Replay.init();
+            }
         } else if (screenName === 'mapEditor') {
-            MapEditor.init();
+            if (typeof MapEditor !== 'undefined' && MapEditor.init) {
+                MapEditor.init();
+            }
         }
     },
     
@@ -378,63 +402,6 @@ const UI = {
             } else {
                 Utils.showNotification(response.message);
             }
-        });
-    },
-    
-    // Gestisce la registrazione
-    handleRegister: () => {
-        const username = UI.elements.login.registerUsername.value.trim();
-        const email = UI.elements.login.registerEmail.value.trim();
-        const password = UI.elements.login.registerPassword.value;
-        const confirmPassword = UI.elements.login.registerConfirmPassword.value;
-        
-        if (!username || !email || !password || !confirmPassword) {
-            Utils.showNotification('Tutti i campi sono obbligatori');
-            return;
-        }
-        
-        if (password !== confirmPassword) {
-            Utils.showNotification('Le password non corrispondono');
-            return;
-        }
-        
-        // Validazione email
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            Utils.showNotification('Inserisci un indirizzo email valido');
-            return;
-        }
-        
-        // Invia richiesta di registrazione
-        fetch('/api/register', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username, email, password })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                UI.elements.login.registerTab.classList.add('hidden');
-                UI.elements.login.verificationMessage.classList.remove('hidden');
-                
-                // In ambiente di test, mostra l'URL di verifica
-                if (data.verificationUrl) {
-                    console.log('URL di verifica:', data.verificationUrl);
-                    
-                    // Simula la verifica automatica per test
-                    setTimeout(() => {
-                        window.location.href = data.verificationUrl;
-                    }, 3000);
-                }
-            } else {
-                Utils.showNotification(data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Errore durante la registrazione:', error);
-            Utils.showNotification('Errore durante la registrazione. Riprova più tardi.');
         });
     },
     
@@ -645,7 +612,7 @@ const UI = {
         socket.emit('joinRoom', { roomId, password, username }, (response) => {
             if (response.success) {
                 UI.state.selectedRoomId = roomId;
-                UI.state.isHost = response.room.host === socket.id;
+                UI.state.isHost = response.isHost;
                 
                 // Aggiorna l'interfaccia della stanza
                 UI.updateRoomUI(response.room);
@@ -705,14 +672,10 @@ const UI = {
                 UI.state.isHost = true;
                 
                 // Aggiorna l'interfaccia della stanza
-                socket.emit('joinRoom', { roomId: response.roomId, username }, (joinResponse) => {
-                    if (joinResponse.success) {
-                        UI.updateRoomUI(joinResponse.room);
-                        UI.showScreen('room');
-                    }
-                });
+                UI.updateRoomUI(response.room);
+                UI.showScreen('room');
             } else {
-                Utils.showNotification('Errore durante la creazione della stanza');
+                Utils.showNotification(response.message || 'Errore durante la creazione della stanza');
             }
         });
     },
@@ -811,7 +774,9 @@ const UI = {
     
     // Esci dal gioco
     exitGame: () => {
-        Game.stopRendering();
+        if (typeof Game !== 'undefined' && Game.stopRendering) {
+            Game.stopRendering();
+        }
         UI.showScreen('room');
     },
     
@@ -835,20 +800,13 @@ const UI = {
         }, (response) => {
             if (response.success) {
                 UI.state.selectedRoomId = response.roomId;
-                UI.state.isHost = response.newRoom === true;
+                UI.state.isHost = response.isHost;
                 
                 // Aggiorna l'interfaccia della stanza
-                socket.emit('joinRoom', {
-                    roomId: response.roomId,
-                    username: UI.state.currentUser.username
-                }, (joinResponse) => {
-                    if (joinResponse.success) {
-                        UI.updateRoomUI(joinResponse.room);
-                        UI.showScreen('room');
-                        UI.state.isMatchmaking = false;
-                        UI.elements.lobby.matchmakingStatus.classList.add('hidden');
-                    }
-                });
+                UI.updateRoomUI(response.room);
+                UI.showScreen('room');
+                UI.state.isMatchmaking = false;
+                UI.elements.lobby.matchmakingStatus.classList.add('hidden');
             } else {
                 Utils.showNotification(response.message);
                 UI.state.isMatchmaking = false;
@@ -918,5 +876,83 @@ const UI = {
                 rankingsList.appendChild(row);
             });
         });
-    }
-};
+    },
+    
+    // Gestisce la registrazione
+    handleRegister: () => {
+        const username = UI.elements.login.registerUsername.value.trim();
+        const email = UI.elements.login.registerEmail.value.trim();
+        const password = UI.elements.login.registerPassword.value;
+        const confirmPassword = UI.elements.login.registerConfirmPassword.value;
+        
+        if (!username || !email || !password || !confirmPassword) {
+            Utils.showNotification('Tutti i campi sono obbligatori');
+            return;
+        }
+        
+        if (password !== confirmPassword) {
+            Utils.showNotification('Le password non corrispondono');
+            return;
+        }
+        
+        // Validazione email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            Utils.showNotification('Inserisci un indirizzo email valido');
+            return;
+        }
+        
+        // Mostra un loader o disabilita il pulsante di registrazione
+        const registerBtn = UI.elements.login.registerBtn;
+        const originalText = registerBtn.textContent;
+        registerBtn.disabled = true;
+        registerBtn.textContent = 'Registrazione in corso...';
+        
+        // Invia richiesta di registrazione
+        fetch('/api/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, email, password })
+        })
+        .then(response => {
+            // Verifica il tipo di contenuto prima di parsificare JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json();
+            }
+            throw new Error('Risposta del server non valida');
+        })
+        .then(data => {
+            // Ripristina lo stato del pulsante
+            registerBtn.disabled = false;
+            registerBtn.textContent = originalText;
+            
+            if (data.success) {
+                UI.elements.login.registerTab.classList.add('hidden');
+                UI.elements.login.verificationMessage.classList.remove('hidden');
+                
+                // In ambiente di test, mostra l'URL di verifica
+                if (data.verificationUrl) {
+                    console.log('URL di verifica:', data.verificationUrl);
+                    
+                    // Se c'è un URL di anteprima email, lo mostra nei log
+                    if (data.previewUrl) {
+                        console.log('Anteprima email:', data.previewUrl);
+                    }
+                }
+                
+                Utils.showNotification('Registrazione completata! Controlla la tua email per verificare l\'account.');
+            } else {
+                Utils.showNotification(data.message || 'Errore durante la registrazione');
+            }
+        })
+        .catch(error => {
+            // Ripristina lo stato del pulsante
+            registerBtn.disabled = false;
+            registerBtn.textContent = originalText;
+            
+            console.error('Errore durante la registrazione:', error);
+            Utils.showNotification('Errore durante la registrazione. Riprova più tardi.');
+        });

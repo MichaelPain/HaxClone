@@ -632,6 +632,38 @@ th {
     opacity: 0;
 }
 
+/* Stili per i messaggi di errore */
+.error-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: #ff5252;
+    color: white;
+    padding: 15px;
+    text-align: center;
+    z-index: 1000;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.error-message {
+    margin-bottom: 10px;
+}
+
+#troubleshoot-button {
+    background-color: white;
+    color: #ff5252;
+    border: none;
+    padding: 5px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+#troubleshoot-button:hover {
+    background-color: #f0f0f0;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .room-content {

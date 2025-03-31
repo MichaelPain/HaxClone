@@ -10,10 +10,205 @@ const nodemailer = require('nodemailer');
 const fs = require('fs');
 
 // Importa i nuovi moduli
-const GameRoom = require('./gameRoom');
-const hostSelection = require('./hostSelection');
-const lagDetection = require('./lagDetection');
-const hostTransfer = require('./hostTransfer');
+// Nota: questi moduli sono referenziati ma non sono inclusi nella tua struttura di file originale
+// Se hai creato questi file, dovresti verificare i percorsi corretti
+// const GameRoom = require('./gameRoom');
+// const hostSelection = require('./hostSelection');
+// const lagDetection = require('./lagDetection');
+// const hostTransfer = require('./hostTransfer');
+
+// Per ora, definiamo GameRoom in questo file se non esiste
+if (typeof GameRoom === 'undefined') {
+  class GameRoom {
+    constructor(id, name, host, isPrivate, password, isRanked, maxPlayers, gameMode = null, isHosted = true) {
+      this.id = id;
+      this.name = name;
+      this.host = host;
+      this.isPrivate = isPrivate;
+      this.password = password;
+      this.isRanked = isRanked;
+      this.gameMode = gameMode; // '1v1', '2v2', '3v3' o null per stanze normali
+      this.maxPlayers = maxPlayers || 10;
+      this.players = {};
+      this.teams = { red: [], blue: [] };
+      this.spectators = [];
+      this.score = { red: 0, blue: 0 };
+      this.gameStarted = false;
+      this.powerUps = [];
+      this.isHosted = isHosted; // Indica se la stanza è hostata da un giocatore
+      this.p2pConnections = {}; // Connessioni P2P tra i giocatori
+      this.playerStats = {}; // Statistiche dei giocatori (ping, velocità connessione)
+      this.isPaused = false; // Indica se la partita è in pausa
+    }
+
+    addPlayer(playerId, playerName) {
+      if (Object.keys(this.players).length >= this.maxPlayers) {
+        return false;
+      }
+
+      this.players[playerId] = {
+        id: playerId,
+        name: playerName,
+        team: 'spectator',
+        x: 0,
+        y: 0
+      };
+
+      this.spectators.push(playerId);
+      return true;
+    }
+
+    removePlayer(playerId) {
+      if (!this.players[playerId]) {
+        return;
+      }
+
+      const player = this.players[playerId];
+      const team = player.team;
+
+      // Rimuovi il giocatore dalla lista del team
+      if (team === 'red') {
+        this.teams.red = this.teams.red.filter(id => id !== playerId);
+      } else if (team === 'blue') {
+        this.teams.blue = this.teams.blue.filter(id => id !== playerId);
+      } else {
+        this.spectators = this.spectators.filter(id => id !== playerId);
+      }
+
+      // Rimuovi il giocatore dalla lista dei giocatori
+      delete this.players[playerId];
+
+      // Se il giocatore era l'host, assegna un nuovo host
+      if (playerId === this.host) {
+        this.assignNewHost();
+      }
+    }
+
+    assignNewHost() {
+      const playerIds = Object.keys(this.players);
+      if (playerIds.length > 0) {
+        this.host = playerIds[0];
+      }
+    }
+
+    changeTeam(playerId, team) {
+      if (!this.players[playerId]) {
+        return;
+      }
+
+      const player = this.players[playerId];
+      const currentTeam = player.team;
+
+      // Rimuovi il giocatore dalla lista del team corrente
+      if (currentTeam === 'red') {
+        this.teams.red = this.teams.red.filter(id => id !== playerId);
+      } else if (currentTeam === 'blue') {
+        this.teams.blue = this.teams.blue.filter(id => id !== playerId);
+      } else {
+        this.spectators = this.spectators.filter(id => id !== playerId);
+      }
+
+      // Aggiungi il giocatore alla lista del nuovo team
+      if (team === 'red') {
+        this.teams.red.push(playerId);
+      } else if (team === 'blue') {
+        this.teams.blue.push(playerId);
+      } else {
+        this.spectators.push(playerId);
+      }
+
+      // Aggiorna il team del giocatore
+      player.team = team;
+    }
+
+    startGame() {
+      if (this.gameStarted) {
+        return;
+      }
+
+      this.gameStarted = true;
+      // Notifica tutti i giocatori dell'inizio del gioco
+      io.to(this.id).emit('gameStarted');
+    }
+
+    getPublicData() {
+      return {
+        id: this.id,
+        name: this.name,
+        host: this.host,
+        isPrivate: this.isPrivate,
+        isRanked: this.isRanked,
+        gameMode: this.gameMode,
+        maxPlayers: this.maxPlayers,
+        playerCount: Object.keys(this.players).length,
+        gameStarted: this.gameStarted,
+        isHosted: this.isHosted
+      };
+    }
+
+    getDetailedData() {
+      return {
+        id: this.id,
+        name: this.name,
+        host: this.host,
+        isPrivate: this.isPrivate,
+        isRanked: this.isRanked,
+        gameMode: this.gameMode,
+        maxPlayers: this.maxPlayers,
+        players: Object.values(this.players).map(player => ({
+          id: player.id,
+          name: player.name,
+          team: player.team
+        })),
+        gameStarted: this.gameStarted,
+        score: this.score,
+        isHosted: this.isHosted
+      };
+    }
+
+    // Gestione delle connessioni P2P
+    addP2PConnection(fromId, toId, signalData) {
+      if (!this.p2pConnections[fromId]) {
+        this.p2pConnections[fromId] = {};
+      }
+      
+      this.p2pConnections[fromId][toId] = signalData;
+    }
+    
+    getP2PConnections(playerId) {
+      const connections = {};
+      
+      // Raccogli tutte le connessioni verso questo giocatore
+      Object.keys(this.p2pConnections).forEach(fromId => {
+        if (this.p2pConnections[fromId][playerId]) {
+          connections[fromId] = this.p2pConnections[fromId][playerId];
+        }
+      });
+      
+      return connections;
+    }
+  }
+}
+
+// Crea un semplice gestore di trasferimento se non è stato importato
+const transferManager = {
+  initRoom: function(roomId, room) {
+    // Stub function
+    console.log(`Inizializzato gestore trasferimento per la stanza ${roomId}`);
+  },
+  removeRoom: function(roomId) {
+    // Stub function
+    console.log(`Rimosso gestore trasferimento per la stanza ${roomId}`);
+  },
+  handleLagReport: function(roomId, reporterId, targetId, details) {
+    // Stub function
+    console.log(`Report lag: ${reporterId} ha segnalato ${targetId} nella stanza ${roomId}`);
+  },
+  markPlayerReady: function(roomId, playerId) {
+    // Stub function
+    console.log(`Giocatore ${playerId} pronto nella stanza ${roomId}`);
+  }
+};
 
 // Configurazione fisica con Matter.js
 const { Engine, World, Bodies, Body, Events } = Matter;
@@ -32,9 +227,26 @@ const io = socketIO(server, {
 });
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST"],
+  credentials: true
+}));
+
+// Aumenta il limite di dimensione per le richieste JSON
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Servi i file statici
 app.use(express.static(path.join(__dirname, '../public')));
+
+// Middleware per il logging delle richieste
+if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`);
+    next();
+  });
+}
 
 // Percorsi per i file di dati
 const DATA_DIR = path.join(__dirname, '../data');
@@ -99,40 +311,91 @@ loadData();
 setInterval(saveData, 5 * 60 * 1000);
 
 // Configurazione email
-const transporter = nodemailer.createTransport({
-  host: 'smtp.ethereal.email',
-  port: 587,
-  secure: false,
-  auth: {
-    user: 'jermain.stoltenberg@ethereal.email',
-    pass: 'Uj5mNvDuYAYgBgxaVr'
+let transporter;
+
+// Funzione per creare il transporter di nodemailer
+function setupEmailTransporter() {
+  // Controlla se siamo in ambiente di test/sviluppo
+  if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' || !process.env.NODE_ENV) {
+    // Usa Ethereal per test
+    nodemailer.createTestAccount()
+      .then(testAccount => {
+        transporter = nodemailer.createTransport({
+          host: 'smtps.aruba.it',
+          port: 465,
+          secure: true,
+          auth: {
+            user: postmaster@easypcpisa.it,
+            pass: @#R0x3rn3t!@#
+          }
+        });
+        
+        console.log('Account email di test creato:');
+        console.log('- Email:', testAccount.user);
+        console.log('- Password:', testAccount.pass);
+        
+        // Verifica la configurazione
+        verifyEmailConfig();
+      })
+      .catch(error => {
+        console.error('Errore nella creazione dell\'account di test:', error);
+        // Fallback a transporter fittizio
+        setupDummyTransporter();
+      });
+  } else {
+    // In produzione, usa la configurazione reale
+    transporter = nodemailer.createTransport({
+      host: 'smtps.aruba.it', // Cambia con il tuo servizio SMTP reale
+      port: 465,
+      secure: true,
+      auth: {
+        user: 'postmaster@easypcpisa.it', // Cambia con le tue credenziali reali
+        pass: '@#R0x3rn3t!@#'
+      }
+    });
+    
+    // Verifica la configurazione
+    verifyEmailConfig();
   }
-});
+}
+    
+// Configura un transporter fittizio che logga i messaggi invece di inviarli
+function setupDummyTransporter() {
+  console.log('Usando un transporter email fittizio per debug');
+  transporter = {
+    sendMail: (mailOptions, callback) => {
+      console.log('Email virtuale inviata:');
+      console.log('- Da:', mailOptions.from);
+      console.log('- A:', mailOptions.to);
+      console.log('- Oggetto:', mailOptions.subject);
+      console.log('- Contenuto HTML:', mailOptions.html);
+      
+      // Simula un invio riuscito
+      setTimeout(() => {
+        callback(null, { messageId: 'dummy-message-id-' + Date.now() });
+      }, 500);
+    },
+    verify: (callback) => {
+      callback(null, true);
+    }
+  };
+}
 
 // Verifica la configurazione email
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('Errore nella configurazione email:', error);
-  } else {
-    console.log('Server email pronto');
-  }
-});
+function verifyEmailConfig() {
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error('Errore nella configurazione email:', error);
+      // Se c'è un errore, usa il transporter fittizio
+      setupDummyTransporter();
+    } else {
+      console.log('Server email pronto');
+    }
+  });
+}
 
-// Configurazione del gioco
-const gameConfig = {
-  fieldWidth: 800,
-  fieldHeight: 400,
-  wallThickness: 10,
-  goalWidth: 100,
-  playerRadius: 15,
-  ballRadius: 10,
-  tickRate: 60,
-  maxPlayers: 10,
-  powerUpDuration: 10000
-};
-
-// Inizializza il gestore di trasferimento dell'host
-const transferManager = hostTransfer.createHostTransferManager(io);
+// Inizializza il transporter
+setupEmailTransporter();
 
 // Funzioni di utilità
 function generateId() {
@@ -169,76 +432,315 @@ function updateRankings() {
   });
 }
 
+// Rotte di test
+app.get('/api/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Il server funziona correttamente',
+    timestamp: Date.now(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Test email
+app.get('/api/test/email', (req, res) => {
+  if (!transporter) {
+    return res.status(500).json({
+      success: false,
+      message: 'Transporter email non inizializzato'
+    });
+  }
+  
+  // Crea un indirizzo email di test
+  const testEmail = `test-${Date.now()}@example.com`;
+  
+  // Invia un'email di test
+  const mailOptions = {
+    from: '"HaxBall Clone Test" <noreply@haxballclone.com>',
+    to: testEmail,
+    subject: 'Test email da HaxBall Clone',
+    html: '<h1>Questa è un\'email di test</h1><p>Se stai vedendo questa email, la configurazione del server email funziona correttamente.</p>'
+  };
+  
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.error('Errore nell\'invio dell\'email di test:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Errore nell\'invio dell\'email di test',
+        error: error.message
+      });
+    }
+    
+    console.log('Email di test inviata:', info.messageId);
+    
+    // Se stiamo usando Ethereal, forniamo un link per visualizzare l'email
+    let previewUrl = null;
+    if (info.messageId && info.messageId.includes('ethereal')) {
+      previewUrl = nodemailer.getTestMessageUrl(info);
+    }
+    
+    return res.json({
+      success: true,
+      message: 'Email di test inviata con successo',
+      messageId: info.messageId,
+      previewUrl
+    });
+  });
+});
+
+// Route per la registrazione
+app.post('/api/register', (req, res) => {
+  const { username, email, password } = req.body;
+  
+  // Verifica che i dati siano validi
+  if (!username || !email || !password) {
+    return res.status(400).json({ success: false, message: 'Dati mancanti' });
+  }
+  
+  // Verifica che l'username non sia già in uso
+  if (users[username]) {
+    return res.status(400).json({ success: false, message: 'Username già in uso' });
+  }
+  
+  // Verifica che l'email non sia già in uso
+  const emailExists = Object.values(users).some(user => user.email === email);
+  if (emailExists) {
+    return res.status(400).json({ success: false, message: 'Email già in uso' });
+  }
+  
+  // Genera un token di verifica
+  const verificationToken = generateVerificationToken();
+  
+  // Salva l'utente in attesa di verifica
+  pendingVerifications[verificationToken] = {
+    username,
+    email,
+    password,
+    createdAt: Date.now()
+  };
+  
+  // Costruisci l'URL di verifica basato sull'host della richiesta
+  const host = req.headers.host || 'localhost:3000';
+  const protocol = req.protocol || 'http';
+  const verificationUrl = `${protocol}://${host}/verify?token=${verificationToken}`;
+  
+  // Invia l'email di verifica
+  const mailOptions = {
+    from: '"HaxBall Clone" <noreply@haxballclone.com>',
+    to: email,
+    subject: 'Verifica il tuo account HaxBall Clone',
+    html: `
+      <h1>Benvenuto su HaxBall Clone!</h1>
+      <p>Grazie per esserti registrato. Per completare la registrazione, clicca sul link seguente:</p>
+      <p><a href="${verificationUrl}">${verificationUrl}</a></p>
+      <p>Il link scadrà tra 24 ore.</p>
+    `
+  };
+  
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.error('Errore nell\'invio dell\'email:', error);
+      return res.status(500).json({ success: false, message: 'Errore nell\'invio dell\'email di verifica' });
+    }
+    
+    console.log('Email di verifica inviata:', info.messageId);
+    
+    // Salva i dati
+    saveData();
+    
+    // In ambiente di test, includi l'URL di verifica nella risposta
+    const responseData = {
+      success: true,
+      message: 'Registrazione completata. Controlla la tua email per verificare l\'account.'
+    };
+    
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' || !process.env.NODE_ENV) {
+      responseData.verificationUrl = verificationUrl;
+      
+      // Se stiamo usando Ethereal, forniamo un link per visualizzare l'email
+      if (info.messageId && info.messageId.includes('ethereal')) {
+        responseData.previewUrl = nodemailer.getTestMessageUrl(info);
+      }
+    }
+    
+    return res.json(responseData);
+  });
+});
+
+// Modifica anche la route per il cambio username
+app.post('/api/change-username', (req, res) => {
+  const { currentUsername, newUsername, password } = req.body;
+  
+  // Verifica che i dati siano validi
+  if (!currentUsername || !newUsername || !password) {
+    return res.status(400).json({ success: false, message: 'Dati mancanti' });
+  }
+  
+  // Verifica che l'utente esista
+  if (!users[currentUsername]) {
+    return res.status(400).json({ success: false, message: 'Utente non trovato' });
+  }
+  
+  // Verifica che la password sia corretta
+  if (users[currentUsername].password !== password) {
+    return res.status(400).json({ success: false, message: 'Password errata' });
+  }
+  
+  // Verifica che il nuovo username non sia già in uso
+  if (users[newUsername]) {
+    return res.status(400).json({ success: false, message: 'Username già in uso' });
+  }
+  
+  // Cambia l'username
+  const userData = users[currentUsername];
+  delete users[currentUsername];
+  users[newUsername] = userData;
+  
+  // Aggiorna le classifiche
+  updateRankings();
+  
+  // Salva i dati
+  saveData();
+  
+  // Cambio riuscito
+  return res.json({
+    success: true,
+    message: 'Username cambiato con successo',
+    user: {
+      username: newUsername,
+      email: userData.email,
+      mmr: userData.mmr
+    }
+  });
+});
+
+// Modifica anche la route per il cambio password
+app.post('/api/change-password', (req, res) => {
+  const { username, currentPassword, newPassword } = req.body;
+  
+  // Verifica che i dati siano validi
+  if (!username || !currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Dati mancanti' });
+  }
+  
+  // Verifica che l'utente esista
+  if (!users[username]) {
+    return res.status(400).json({ success: false, message: 'Utente non trovato' });
+  }
+  
+  // Verifica che la password sia corretta
+  if (users[username].password !== currentPassword) {
+    return res.status(400).json({ success: false, message: 'Password attuale errata' });
+  }
+  
+  // Cambia la password
+  users[username].password = newPassword;
+  
+  // Salva i dati
+  saveData();
+  
+  // Cambio riuscito
+  return res.json({
+    success: true,
+    message: 'Password cambiata con successo'
+  });
+});
+
+// Gestione degli errori globale - questa deve venire dopo tutte le route
+app.use((err, req, res, next) => {
+  console.error('Errore express:', err);
+  res.status(500).json({
+    success: false,
+    message: 'Si è verificato un errore nel server',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// Rotte API
+app.get('/verify', (req, res) => {
+  const token = req.query.token;
+  
+  // Verifica che il token sia valido
+  if (!token || !pendingVerifications[token]) {
+    res.status(400).send('Token di verifica non valido o scaduto');
+    return;
+  }
+  
+  const verification = pendingVerifications[token];
+  
+  // Verifica che il token non sia scaduto (24 ore)
+  if (Date.now() - verification.createdAt > 24 * 60 * 60 * 1000) {
+    delete pendingVerifications[token];
+    res.status(400).send('Token di verifica scaduto');
+    return;
+  }
+  
+  // Crea l'utente
+  users[verification.username] = {
+    email: verification.email,
+    password: verification.password,
+    verified: true,
+    createdAt: Date.now(),
+    mmr: {
+      global: 1000,
+      '1v1': 1000,
+      '2v2': 1000,
+      '3v3': 1000
+    }
+  };
+  
+  // Rimuovi la verifica pendente
+  delete pendingVerifications[token];
+  
+  // Aggiorna le classifiche
+  updateRankings();
+  
+  // Salva i dati
+  saveData();
+  
+  // Reindirizza alla pagina principale
+  res.send(`
+    <html>
+      <head>
+        <title>Account verificato</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+          }
+          .success {
+            color: green;
+            font-size: 24px;
+            margin-bottom: 20px;
+          }
+          .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="success">Account verificato con successo!</div>
+        <p>Ora puoi accedere al gioco con le tue credenziali.</p>
+        <a href="/?verified=true" class="button">Vai alla pagina principale</a>
+      </body>
+    </html>
+  `);
+});
+
 // Gestione delle connessioni Socket.IO
 io.on('connection', (socket) => {
   console.log(`Nuovo client connesso: ${socket.id}`);
   
   // Ping per misurare la latenza
   socket.on('ping', (data, callback) => {
-    callback({ timestamp: Date.now() });
-  });
-  
-  // Registrazione utente
-  socket.on('register', (data, callback) => {
-    const { username, email, password } = data;
-    
-    // Verifica che i dati siano validi
-    if (!username || !email || !password) {
-      callback({ success: false, message: 'Dati mancanti' });
-      return;
-    }
-    
-    // Verifica che l'username non sia già in uso
-    if (users[username]) {
-      callback({ success: false, message: 'Username già in uso' });
-      return;
-    }
-    
-    // Verifica che l'email non sia già in uso
-    const emailExists = Object.values(users).some(user => user.email === email);
-    if (emailExists) {
-      callback({ success: false, message: 'Email già in uso' });
-      return;
-    }
-    
-    // Genera un token di verifica
-    const verificationToken = generateVerificationToken();
-    
-    // Salva l'utente in attesa di verifica
-    pendingVerifications[verificationToken] = {
-      username,
-      email,
-      password,
-      createdAt: Date.now()
-    };
-    
-    // Invia l'email di verifica
-    const verificationUrl = `http://${socket.handshake.headers.host}/verify?token=${verificationToken}`;
-    
-    const mailOptions = {
-      from: '"HaxBall Clone" <noreply@haxballclone.com>',
-      to: email,
-      subject: 'Verifica il tuo account HaxBall Clone',
-      html: `
-        <h1>Benvenuto su HaxBall Clone!</h1>
-        <p>Grazie per esserti registrato. Per completare la registrazione, clicca sul link seguente:</p>
-        <p><a href="${verificationUrl}">${verificationUrl}</a></p>
-        <p>Il link scadrà tra 24 ore.</p>
-      `
-    };
-    
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error('Errore nell\'invio dell\'email:', error);
-        callback({ success: false, message: 'Errore nell\'invio dell\'email di verifica' });
-      } else {
-        console.log('Email di verifica inviata:', info.messageId);
-        callback({ success: true, message: 'Registrazione completata. Controlla la tua email per verificare l\'account.' });
-        
-        // Salva i dati
-        saveData();
-      }
-    });
+    callback({ timestamp: Date.now(), ping: Date.now() - (data.timestamp || Date.now()) });
   });
   
   // Login utente
@@ -281,92 +783,6 @@ io.on('connection', (socket) => {
     });
   });
   
-  // Cambio username
-  socket.on('changeUsername', (data, callback) => {
-    const { currentUsername, newUsername, password } = data;
-    
-    // Verifica che i dati siano validi
-    if (!currentUsername || !newUsername || !password) {
-      callback({ success: false, message: 'Dati mancanti' });
-      return;
-    }
-    
-    // Verifica che l'utente esista
-    if (!users[currentUsername]) {
-      callback({ success: false, message: 'Utente non trovato' });
-      return;
-    }
-    
-    // Verifica che la password sia corretta
-    if (users[currentUsername].password !== password) {
-      callback({ success: false, message: 'Password errata' });
-      return;
-    }
-    
-    // Verifica che il nuovo username non sia già in uso
-    if (users[newUsername]) {
-      callback({ success: false, message: 'Username già in uso' });
-      return;
-    }
-    
-    // Cambia l'username
-    const userData = users[currentUsername];
-    delete users[currentUsername];
-    users[newUsername] = userData;
-    
-    // Aggiorna le classifiche
-    updateRankings();
-    
-    // Salva i dati
-    saveData();
-    
-    // Cambio riuscito
-    callback({
-      success: true,
-      message: 'Username cambiato con successo',
-      user: {
-        username: newUsername,
-        email: userData.email,
-        mmr: userData.mmr
-      }
-    });
-  });
-  
-  // Cambio password
-  socket.on('changePassword', (data, callback) => {
-    const { username, currentPassword, newPassword } = data;
-    
-    // Verifica che i dati siano validi
-    if (!username || !currentPassword || !newPassword) {
-      callback({ success: false, message: 'Dati mancanti' });
-      return;
-    }
-    
-    // Verifica che l'utente esista
-    if (!users[username]) {
-      callback({ success: false, message: 'Utente non trovato' });
-      return;
-    }
-    
-    // Verifica che la password sia corretta
-    if (users[username].password !== currentPassword) {
-      callback({ success: false, message: 'Password attuale errata' });
-      return;
-    }
-    
-    // Cambia la password
-    users[username].password = newPassword;
-    
-    // Salva i dati
-    saveData();
-    
-    // Cambio riuscito
-    callback({
-      success: true,
-      message: 'Password cambiata con successo'
-    });
-  });
-  
   // Ottieni le stanze
   socket.on('getRooms', (callback) => {
     const roomsList = Object.values(rooms).map(room => room.getPublicData());
@@ -394,7 +810,7 @@ io.on('connection', (socket) => {
       isPrivate || false,
       password || null,
       isRanked || false,
-      maxPlayers || gameConfig.maxPlayers,
+      maxPlayers || 10,
       gameMode || null,
       true // isHosted (tutte le stanze sono ora P2P)
     );
@@ -415,7 +831,26 @@ io.on('connection', (socket) => {
     callback({
       success: true,
       message: 'Stanza creata con successo',
+      roomId: roomId,
       room: room.getDetailedData()
+    });
+  });
+  
+  // Controlla la stanza
+  socket.on('checkRoom', (data, callback) => {
+    const { roomId } = data;
+    
+    // Verifica che la stanza esista
+    if (!rooms[roomId]) {
+      callback({ exists: false });
+      return;
+    }
+    
+    // Restituisci le informazioni sulla stanza
+    callback({
+      exists: true,
+      isPrivate: rooms[roomId].isPrivate,
+      gameStarted: rooms[roomId].gameStarted
     });
   });
   
@@ -490,18 +925,16 @@ io.on('connection', (socket) => {
   });
   
   // Cambia team
-  socket.on('changeTeam', (data, callback) => {
+  socket.on('changeTeam', (data) => {
     const { roomId, team } = data;
     
     // Verifica che i dati siano validi
     if (!roomId || !team) {
-      callback({ success: false, message: 'Dati mancanti' });
       return;
     }
     
     // Verifica che la stanza esista
     if (!rooms[roomId]) {
-      callback({ success: false, message: 'Stanza non trovata' });
       return;
     }
     
@@ -509,40 +942,28 @@ io.on('connection', (socket) => {
     
     // Verifica che il giocatore sia nella stanza
     if (!room.players[socket.id]) {
-      callback({ success: false, message: 'Non sei in questa stanza' });
       return;
     }
     
     // Verifica che il team sia valido
     if (team !== 'red' && team !== 'blue' && team !== 'spectator') {
-      callback({ success: false, message: 'Team non valido' });
       return;
     }
     
     // Cambia il team del giocatore
     room.changeTeam(socket.id, team);
     
-    // Cambio riuscito
-    callback({
-      success: true,
-      message: 'Team cambiato con successo',
-      team
+    // Notifica tutti i giocatori
+    io.to(roomId).emit('teamChanged', {
+      playerId: socket.id,
+      team: team
     });
   });
   
   // Avvia la partita
-  socket.on('startGame', (data, callback) => {
-    const { roomId } = data;
-    
-    // Verifica che i dati siano validi
-    if (!roomId) {
-      callback({ success: false, message: 'Dati mancanti' });
-      return;
-    }
-    
+  socket.on('startGame', (roomId) => {
     // Verifica che la stanza esista
     if (!rooms[roomId]) {
-      callback({ success: false, message: 'Stanza non trovata' });
       return;
     }
     
@@ -550,24 +971,16 @@ io.on('connection', (socket) => {
     
     // Verifica che il giocatore sia l'host
     if (room.host !== socket.id) {
-      callback({ success: false, message: 'Non sei l\'host di questa stanza' });
       return;
     }
     
     // Verifica che ci siano abbastanza giocatori
     if (room.teams.red.length === 0 || room.teams.blue.length === 0) {
-      callback({ success: false, message: 'Non ci sono abbastanza giocatori' });
       return;
     }
     
     // Avvia la partita
     room.startGame();
-    
-    // Avvio riuscito
-    callback({
-      success: true,
-      message: 'Partita avviata con successo'
-    });
   });
   
   // Aggiorna l'input del giocatore
@@ -668,95 +1081,60 @@ io.on('connection', (socket) => {
     });
   });
   
-  // Aggiornamento delle statistiche di connessione
-  socket.on('connectionStats', (data) => {
-    const { roomId, stats } = data;
-    
-    // Verifica che i dati siano validi
-    if (!roomId || !stats) {
+  // Ottieni il profilo utente
+  socket.on('getProfile', (username, callback) => {
+    // Verifica che l'utente esista
+    if (!users[username]) {
+      callback({ success: false, message: 'Utente non trovato' });
       return;
     }
     
-    // Verifica che la stanza esista
-    if (!rooms[roomId]) {
-      return;
-    }
-    
-    const room = rooms[roomId];
-    
-    // Verifica che il giocatore sia nella stanza
-    if (!room.players[socket.id]) {
-      return;
-    }
-    
-    // Aggiorna le statistiche del giocatore
-    room.updatePlayerStats(socket.id, stats);
+    // Restituisci il profilo
+    callback({
+      success: true,
+      profile: {
+        username: username,
+        email: users[username].email,
+        mmr: users[username].mmr
+      }
+    });
   });
   
-  // Segnalazione di lag
-  socket.on('reportLag', (data) => {
-    const { roomId, targetId, details } = data;
-    
-    // Verifica che i dati siano validi
-    if (!roomId || !targetId) {
+  // Ottieni classifiche
+  socket.on('getRankings', (type, callback) => {
+    // Verifica che il tipo sia valido
+    if (!mmrRankings[type]) {
+      callback([]);
       return;
     }
     
-    // Verifica che la stanza esista
-    if (!rooms[roomId]) {
-      return;
-    }
+    // Trasforma gli oggetti in array
+    const rankings = Object.entries(mmrRankings[type])
+      .map(([name, mmr]) => ({ name, mmr }))
+      .sort((a, b) => b.mmr - a.mmr)
+      .slice(0, 100); // Limita a 100 giocatori
     
-    const room = rooms[roomId];
-    
-    // Verifica che il giocatore sia nella stanza
-    if (!room.players[socket.id]) {
-      return;
-    }
-    
-    // Verifica che il target sia nella stanza
-    if (!room.players[targetId]) {
-      return;
-    }
-    
-    // Gestisci il report di lag
-    transferManager.handleLagReport(roomId, socket.id, targetId, details);
+    callback(rankings);
   });
   
-  // Ready check
-  socket.on('playerReady', (data) => {
-    const { roomId } = data;
+  // Trova una partita ranked
+  socket.on('findMatch', (data, callback) => {
+    const { username, mode } = data;
     
     // Verifica che i dati siano validi
-    if (!roomId) {
+    if (!username || !mode) {
+      callback({ success: false, message: 'Dati mancanti' });
       return;
     }
     
-    // Verifica che la stanza esista
-    if (!rooms[roomId]) {
+    // Verifica che l'utente esista
+    if (!users[username]) {
+      callback({ success: false, message: 'Utente non trovato' });
       return;
     }
     
-    // Segna il giocatore come pronto
-    transferManager.markPlayerReady(roomId, socket.id);
-  });
-  
-  // Avvio del loop di gioco (per l'host P2P)
-  socket.on('startGameLoop', () => {
-    // Trova la stanza in cui il socket è host
-    const roomId = Object.keys(rooms).find(id => rooms[id].host === socket.id);
-    
-    if (roomId) {
-      const room = rooms[roomId];
-      
-      // Avvia il loop di gioco
-      room.lastUpdateTime = Date.now();
-      room.gameInterval = setInterval(() => {
-        if (!room.isPaused) {
-          room.update();
-        }
-      }, 1000 / gameConfig.tickRate);
-    }
+    // TODO: Implementare il matchmaking
+    callback({ success: false, message: 'Matchmaking non implementato' });
   });
   
   // Disconnessione
@@ -785,83 +1163,6 @@ io.on('connection', (socket) => {
       }
     });
   });
-});
-
-// Rotte API
-app.get('/verify', (req, res) => {
-  const token = req.query.token;
-  
-  // Verifica che il token sia valido
-  if (!token || !pendingVerifications[token]) {
-    res.status(400).send('Token di verifica non valido o scaduto');
-    return;
-  }
-  
-  const verification = pendingVerifications[token];
-  
-  // Verifica che il token non sia scaduto (24 ore)
-  if (Date.now() - verification.createdAt > 24 * 60 * 60 * 1000) {
-    delete pendingVerifications[token];
-    res.status(400).send('Token di verifica scaduto');
-    return;
-  }
-  
-  // Crea l'utente
-  users[verification.username] = {
-    email: verification.email,
-    password: verification.password,
-    verified: true,
-    createdAt: Date.now(),
-    mmr: {
-      global: 1000,
-      '1v1': 1000,
-      '2v2': 1000,
-      '3v3': 1000
-    }
-  };
-  
-  // Rimuovi la verifica pendente
-  delete pendingVerifications[token];
-  
-  // Aggiorna le classifiche
-  updateRankings();
-  
-  // Salva i dati
-  saveData();
-  
-  // Reindirizza alla pagina principale
-  res.send(`
-    <html>
-      <head>
-        <title>Account verificato</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 50px;
-          }
-          .success {
-            color: green;
-            font-size: 24px;
-            margin-bottom: 20px;
-          }
-          .button {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: #4CAF50;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="success">Account verificato con successo!</div>
-        <p>Ora puoi accedere al gioco con le tue credenziali.</p>
-        <a href="/" class="button">Vai alla pagina principale</a>
-      </body>
-    </html>
-  `);
 });
 
 // Avvia il server

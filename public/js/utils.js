@@ -8,6 +8,7 @@ const Utils = {
         notificationMessage.textContent = message;
         notification.classList.remove('hidden');
         
+        // Nascondi la notifica dopo 3 secondi
         setTimeout(() => {
             notification.classList.add('hidden');
         }, 3000);
@@ -44,6 +45,26 @@ const Utils = {
         return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
     },
     
+    // Verifica se un punto è dentro un rettangolo
+    pointInRect: (px, py, rx, ry, rw, rh) => {
+        return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
+    },
+    
+    // Verifica se un punto è dentro un cerchio
+    pointInCircle: (px, py, cx, cy, r) => {
+        return Utils.distance(px, py, cx, cy) <= r;
+    },
+    
+    // Disegna un'ombra
+    drawShadow: (ctx, x, y, radius) => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y + 2, radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fill();
+        ctx.restore();
+    },
+    
     // Genera un colore casuale
     randomColor: () => {
         const letters = '0123456789ABCDEF';
@@ -67,28 +88,53 @@ const Utils = {
     // Controlla la connessione al server
     checkServerConnection: (callback) => {
         try {
-            const testSocket = io(CONFIG.SERVER_URL, {
-                timeout: 5000,
-                reconnection: false,
-                forceNew: true
-            });
+            // Prima prova a fare una richiesta di test al server
+            fetch('/api/test')
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error('Impossibile raggiungere il server');
+                })
+                .then(data => {
+                    if (data.success) {
+                        callback(true);
+                    } else {
+                        callback(false, new Error('Il server ha risposto, ma con un errore'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore di connessione HTTP al server:', error);
+                    
+                    // Se la richiesta HTTP fallisce, prova con un socket
+                    trySocketConnection();
+                });
             
-            testSocket.on('connect', () => {
-                testSocket.disconnect();
-                callback(true);
-            });
-            
-            testSocket.on('connect_error', (error) => {
-                console.error('Errore di connessione al server:', error);
-                testSocket.disconnect();
-                callback(false, error);
-            });
-            
-            testSocket.on('connect_timeout', () => {
-                console.error('Timeout di connessione al server');
-                testSocket.disconnect();
-                callback(false, new Error('Timeout di connessione'));
-            });
+            // Funzione per provare la connessione socket
+            function trySocketConnection() {
+                const testSocket = io(CONFIG.SERVER_URL, {
+                    timeout: 5000,
+                    reconnection: false,
+                    forceNew: true
+                });
+                
+                testSocket.on('connect', () => {
+                    testSocket.disconnect();
+                    callback(true);
+                });
+                
+                testSocket.on('connect_error', (error) => {
+                    console.error('Errore di connessione al server:', error);
+                    testSocket.disconnect();
+                    callback(false, error);
+                });
+                
+                testSocket.on('connect_timeout', () => {
+                    console.error('Timeout di connessione al server');
+                    testSocket.disconnect();
+                    callback(false, new Error('Timeout di connessione'));
+                });
+            }
         } catch (error) {
             console.error('Errore durante il controllo della connessione:', error);
             callback(false, error);
@@ -97,45 +143,89 @@ const Utils = {
     
     // Tenta di risolvere problemi di connessione
     troubleshootConnection: () => {
-        // Verifica se il server è raggiungibile
-        Utils.checkServerConnection((isConnected, error) => {
-            if (isConnected) {
-                Utils.showNotification('Connessione al server stabilita con successo!');
-            } else {
-                // Prova a connettersi usando IP alternativo
-                const alternativeUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                    ? 'http://0.0.0.0:3000'
-                    : `http://${window.location.hostname}:3000`;
-                
-                try {
-                    const testSocket = io(alternativeUrl, {
-                        timeout: 5000,
-                        reconnection: false,
-                        forceNew: true
-                    });
-                    
-                    testSocket.on('connect', () => {
-                        testSocket.disconnect();
-                        CONFIG.SERVER_URL = alternativeUrl;
-                        Utils.showNotification('Connessione stabilita con indirizzo alternativo!');
-                        
-                        // Riconnetti il socket principale
-                        if (socket) {
-                            socket.disconnect();
-                            socket = io(CONFIG.SERVER_URL);
-                        }
-                    });
-                    
-                    testSocket.on('connect_error', () => {
-                        testSocket.disconnect();
-                        Utils.showNotification('Impossibile connettersi al server. Verifica la tua connessione e che il server sia in esecuzione.');
-                    });
-                } catch (error) {
-                    console.error('Errore durante il tentativo di connessione alternativa:', error);
-                    Utils.showNotification('Impossibile connettersi al server. Verifica la tua connessione e che il server sia in esecuzione.');
+        Utils.showNotification('Tentativo di risoluzione dei problemi di connessione...');
+        
+        // Prima verifica se il server è raggiungibile all'URL base
+        fetch('/')
+            .then(response => {
+                if (response.ok) {
+                    Utils.showNotification('Connessione al server OK. Verifica l\'API...');
+                    return fetch('/api/test');
                 }
-            }
-        });
+                throw new Error('Server non raggiungibile');
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error('API non raggiungibile');
+            })
+            .then(data => {
+                if (data.success) {
+                    Utils.showNotification('Connessione ristabilita!');
+                    
+                    // Ricarica la pagina dopo un breve ritardo
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    throw new Error('Risposta API non valida');
+                }
+            })
+            .catch(error => {
+                console.error('Errore durante il troubleshooting:', error);
+                
+                // Prova URL alternativi
+                const alternativeUrls = [
+                    window.location.origin,
+                    'http://localhost:3000',
+                    'http://127.0.0.1:3000'
+                ];
+                
+                Utils.showNotification('Tentativo con URL alternativi...');
+                tryNextUrl(0);
+                
+                function tryNextUrl(index) {
+                    if (index >= alternativeUrls.length) {
+                        Utils.showNotification('Impossibile connettersi al server. Ricarica la pagina e riprova.');
+                        return;
+                    }
+                    
+                    const url = alternativeUrls[index];
+                    console.log(`Tentativo con URL: ${url}`);
+                    
+                    fetch(`${url}/api/test`)
+                        .then(response => {
+                            if (response.ok) {
+                                return response.json();
+                            }
+                            throw new Error(`${url} non raggiungibile`);
+                        })
+                        .then(data => {
+                            if (data.success) {
+                                CONFIG.SERVER_URL = url;
+                                Utils.showNotification(`Connessione stabilita con ${url}!`);
+                                
+                                // Riconnetti il socket principale
+                                if (socket) {
+                                    socket.disconnect();
+                                    socket = io(CONFIG.SERVER_URL);
+                                }
+                                
+                                // Ricarica la pagina dopo un breve ritardo
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 2000);
+                            } else {
+                                throw new Error(`Risposta API non valida da ${url}`);
+                            }
+                        })
+                        .catch(error => {
+                            console.error(`Errore con ${url}:`, error);
+                            tryNextUrl(index + 1);
+                        });
+                }
+            });
     },
     
     // Ping al server per misurare la latenza
@@ -199,5 +289,28 @@ const Utils = {
             console.error('Errore nel parsing JSON:', e);
             return null;
         }
+    },
+    
+    // Test della funzionalità email
+    testEmail: () => {
+        fetch('/api/test/email')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Utils.showNotification('Test email inviato con successo!');
+                    
+                    if (data.previewUrl) {
+                        console.log('Anteprima email:', data.previewUrl);
+                        // Apri l'URL di anteprima in una nuova finestra
+                        window.open(data.previewUrl, '_blank');
+                    }
+                } else {
+                    Utils.showNotification('Errore nell\'invio dell\'email di test: ' + (data.message || 'Errore sconosciuto'));
+                }
+            })
+            .catch(error => {
+                console.error('Errore durante il test email:', error);
+                Utils.showNotification('Errore nella comunicazione con il server durante il test email');
+            });
     }
 };

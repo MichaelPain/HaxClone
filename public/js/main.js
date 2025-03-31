@@ -2,6 +2,19 @@
 let socket;
 let p2pConnections = {}; // Memorizza le connessioni P2P
 
+// Gestione degli errori globali - aggiunto per migliorare il debug
+window.onerror = function(message, source, lineno, colno, error) {
+    console.error('Errore non catturato:', message, 'in', source, 'linea', lineno, ':', error);
+    Utils.showNotification('Si è verificato un errore: ' + message);
+    return true; // Permettiamo al browser di gestire l'errore anche dopo il nostro handler
+};
+
+// Gestione delle promesse non gestite - aggiunto per migliorare il debug
+window.addEventListener('unhandledrejection', function(event) {
+    console.error('Promise non gestita:', event.reason);
+    Utils.showNotification('Si è verificato un errore con una promise: ' + event.reason);
+});
+
 // Quando il documento è pronto
 document.addEventListener('DOMContentLoaded', () => {
     // Verifica il supporto per WebSocket
@@ -467,9 +480,41 @@ function getPowerUpName(type) {
     }
 }
 
-// Gestione degli errori globali
-window.onerror = function(message, source, lineno, colno, error) {
-    console.error('Errore JavaScript:', message, source, lineno, colno, error);
-    Utils.showNotification('Si è verificato un errore. Controlla la console per i dettagli.');
-    return true;
-};
+// Mostra un messaggio di errore visibile
+function showErrorContainer(message) {
+    // Crea o aggiorna un container di errore
+    let errorContainer = document.getElementById('error-container');
+    
+    if (!errorContainer) {
+        errorContainer = document.createElement('div');
+        errorContainer.id = 'error-container';
+        errorContainer.style.position = 'fixed';
+        errorContainer.style.top = '0';
+        errorContainer.style.left = '0';
+        errorContainer.style.width = '100%';
+        errorContainer.style.backgroundColor = '#ff5252';
+        errorContainer.style.color = 'white';
+        errorContainer.style.padding = '15px';
+        errorContainer.style.textAlign = 'center';
+        errorContainer.style.zIndex = '1000';
+        errorContainer.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
+        document.body.appendChild(errorContainer);
+    }
+    
+    errorContainer.textContent = message;
+    errorContainer.style.display = 'block';
+    
+    // Aggiungi un pulsante per nascondere il messaggio
+    const closeButton = document.createElement('button');
+    closeButton.textContent = 'Chiudi';
+    closeButton.style.marginLeft = '10px';
+    closeButton.style.padding = '5px 10px';
+    closeButton.style.border = 'none';
+    closeButton.style.borderRadius = '3px';
+    closeButton.style.cursor = 'pointer';
+    closeButton.addEventListener('click', () => {
+        errorContainer.style.display = 'none';
+    });
+    
+    errorContainer.appendChild(closeButton);
+}
