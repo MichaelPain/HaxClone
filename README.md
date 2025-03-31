@@ -77,15 +77,15 @@ Controlli di riproduzione avanzati (pausa, avanti/indietro, velocità)
 
 Struttura del Progetto
 Copyhaxball-clone/
-├── public/               # File client-side
-│   ├── css/              # Fogli di stile
-│   │   └── style.css     # Stile principale
-│   ├── js/               # Script JavaScript client
-│   │   ├── config.js     # Configurazione del gioco
-│   │   ├── game.js       # Logica di gioco principale
-│   │   ├── main.js       # Punto di ingresso dell'applicazione
-│   │   ├── mapEditor.js  # Editor di mappe personalizzate
-│   │   ├── readyCheck.js # Componente per il ready check dopo il cambio di host
+├── public/               # File client-side  
+│   ├── css/              # Fogli di stile  
+│   │   └── style.css     # Stile principale  
+│   ├── js/               # Script JavaScript client  
+│   │   ├── config.js     # Configurazione del gioco  
+│   │   ├── game.js       # Logica di gioco principale  
+│   │   ├── main.js       # Punto di ingresso dell'applicazione  
+│   │   ├── mapEditor.js  # Editor di mappe personalizzate  
+│   │   ├── readyCheck.js # Componente per il ready check dopo il cambio di host  
 │   │   ├── replay.js     # Sistema di replay
 │   │   ├── ui.js         # Gestione dell'interfaccia utente
 │   │   └── utils.js      # Funzioni di utilità
