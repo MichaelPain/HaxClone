@@ -8,6 +8,7 @@ const Matter = require('matter-js');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const fs = require('fs');
+const { Engine, World, Bodies, Body, Events } = require('matter-js');
 
 // Importa i nuovi moduli
 // Nota: questi moduli sono referenziati ma non sono inclusi nella tua struttura di file originale
@@ -18,28 +19,28 @@ const fs = require('fs');
 // const hostTransfer = require('./hostTransfer');
 
 // Per ora, definiamo GameRoom in questo file se non esiste
-if (typeof GameRoom === 'undefined') {
-  class GameRoom {
-    constructor(id, name, host, isPrivate, password, isRanked, maxPlayers, gameMode = null, isHosted = true) {
-      this.id = id;
-      this.name = name;
-      this.host = host;
-      this.isPrivate = isPrivate;
-      this.password = password;
-      this.isRanked = isRanked;
-      this.gameMode = gameMode; // '1v1', '2v2', '3v3' o null per stanze normali
-      this.maxPlayers = maxPlayers || 10;
-      this.players = {};
-      this.teams = { red: [], blue: [] };
-      this.spectators = [];
-      this.score = { red: 0, blue: 0 };
-      this.gameStarted = false;
-      this.powerUps = [];
-      this.isHosted = isHosted; // Indica se la stanza è hostata da un giocatore
-      this.p2pConnections = {}; // Connessioni P2P tra i giocatori
-      this.playerStats = {}; // Statistiche dei giocatori (ping, velocità connessione)
-      this.isPaused = false; // Indica se la partita è in pausa
-    }
+// Definisci la classe GameRoom
+class GameRoom {
+  constructor(id, name, host, isPrivate, password, isRanked, maxPlayers, gameMode = null, isHosted = true) {
+    this.id = id;
+    this.name = name;
+    this.host = host;
+    this.isPrivate = isPrivate;
+    this.password = password;
+    this.isRanked = isRanked;
+    this.gameMode = gameMode; // '1v1', '2v2', '3v3' o null per stanze normali
+    this.maxPlayers = maxPlayers || 10;
+    this.players = {};
+    this.teams = { red: [], blue: [] };
+    this.spectators = [];
+    this.score = { red: 0, blue: 0 };
+    this.gameStarted = false;
+    this.powerUps = [];
+    this.isHosted = isHosted; // Indica se la stanza è hostata da un giocatore
+    this.p2pConnections = {}; // Connessioni P2P tra i giocatori
+    this.playerStats = {}; // Statistiche dei giocatori (ping, velocità connessione)
+    this.isPaused = false; // Indica se la partita è in pausa
+  }
 
     addPlayer(playerId, playerName) {
       if (Object.keys(this.players).length >= this.maxPlayers) {
