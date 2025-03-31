@@ -104,6 +104,8 @@ Copyhaxball-clone/
 ├── package.json          # Configurazione npm e dipendenze
 ├── README-UPDATED.md     # Questa documentazione aggiornata
 └── README.md             # Documentazione originale del progetto
+
+
 Requisiti
 
 Node.js (v14+)
